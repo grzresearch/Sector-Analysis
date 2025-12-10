@@ -14,6 +14,216 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
+# Fallback ticker list with sectors (subset of S&P 500 and Nasdaq)
+FALLBACK_TICKERS = {
+    # Technology
+    'AAPL': ('Apple Inc.', 'Technology'),
+    'MSFT': ('Microsoft Corp.', 'Technology'),
+    'GOOGL': ('Alphabet Inc.', 'Technology'),
+    'AMZN': ('Amazon.com Inc.', 'Technology'),
+    'NVDA': ('NVIDIA Corp.', 'Technology'),
+    'META': ('Meta Platforms Inc.', 'Technology'),
+    'TSLA': ('Tesla Inc.', 'Technology'),
+    'AMD': ('Advanced Micro Devices', 'Technology'),
+    'INTC': ('Intel Corp.', 'Technology'),
+    'CRM': ('Salesforce Inc.', 'Technology'),
+    'ORCL': ('Oracle Corp.', 'Technology'),
+    'CSCO': ('Cisco Systems', 'Technology'),
+    'ADBE': ('Adobe Inc.', 'Technology'),
+    'AVGO': ('Broadcom Inc.', 'Technology'),
+    'TXN': ('Texas Instruments', 'Technology'),
+    'QCOM': ('Qualcomm Inc.', 'Technology'),
+    'IBM': ('IBM Corp.', 'Technology'),
+    'NOW': ('ServiceNow Inc.', 'Technology'),
+    'INTU': ('Intuit Inc.', 'Technology'),
+    'AMAT': ('Applied Materials', 'Technology'),
+
+    # Health Care
+    'JNJ': ('Johnson & Johnson', 'Health Care'),
+    'UNH': ('UnitedHealth Group', 'Health Care'),
+    'PFE': ('Pfizer Inc.', 'Health Care'),
+    'ABBV': ('AbbVie Inc.', 'Health Care'),
+    'MRK': ('Merck & Co.', 'Health Care'),
+    'LLY': ('Eli Lilly', 'Health Care'),
+    'TMO': ('Thermo Fisher', 'Health Care'),
+    'ABT': ('Abbott Labs', 'Health Care'),
+    'DHR': ('Danaher Corp.', 'Health Care'),
+    'BMY': ('Bristol-Myers Squibb', 'Health Care'),
+    'AMGN': ('Amgen Inc.', 'Health Care'),
+    'GILD': ('Gilead Sciences', 'Health Care'),
+    'CVS': ('CVS Health', 'Health Care'),
+    'ISRG': ('Intuitive Surgical', 'Health Care'),
+    'VRTX': ('Vertex Pharma', 'Health Care'),
+
+    # Financials
+    'JPM': ('JPMorgan Chase', 'Financials'),
+    'BAC': ('Bank of America', 'Financials'),
+    'WFC': ('Wells Fargo', 'Financials'),
+    'GS': ('Goldman Sachs', 'Financials'),
+    'MS': ('Morgan Stanley', 'Financials'),
+    'BLK': ('BlackRock Inc.', 'Financials'),
+    'C': ('Citigroup Inc.', 'Financials'),
+    'AXP': ('American Express', 'Financials'),
+    'SCHW': ('Charles Schwab', 'Financials'),
+    'USB': ('US Bancorp', 'Financials'),
+    'PNC': ('PNC Financial', 'Financials'),
+    'TFC': ('Truist Financial', 'Financials'),
+    'COF': ('Capital One', 'Financials'),
+    'BK': ('Bank of NY Mellon', 'Financials'),
+    'CME': ('CME Group', 'Financials'),
+
+    # Consumer Discretionary
+    'HD': ('Home Depot', 'Consumer Discretionary'),
+    'NKE': ('Nike Inc.', 'Consumer Discretionary'),
+    'MCD': ('McDonalds Corp.', 'Consumer Discretionary'),
+    'SBUX': ('Starbucks Corp.', 'Consumer Discretionary'),
+    'LOW': ('Lowes Companies', 'Consumer Discretionary'),
+    'TGT': ('Target Corp.', 'Consumer Discretionary'),
+    'TJX': ('TJX Companies', 'Consumer Discretionary'),
+    'BKNG': ('Booking Holdings', 'Consumer Discretionary'),
+    'F': ('Ford Motor', 'Consumer Discretionary'),
+    'GM': ('General Motors', 'Consumer Discretionary'),
+    'ROST': ('Ross Stores', 'Consumer Discretionary'),
+    'MAR': ('Marriott Intl', 'Consumer Discretionary'),
+    'YUM': ('Yum Brands', 'Consumer Discretionary'),
+    'DHI': ('D.R. Horton', 'Consumer Discretionary'),
+    'ORLY': ('OReilly Auto', 'Consumer Discretionary'),
+
+    # Consumer Staples
+    'PG': ('Procter & Gamble', 'Consumer Staples'),
+    'KO': ('Coca-Cola Co.', 'Consumer Staples'),
+    'PEP': ('PepsiCo Inc.', 'Consumer Staples'),
+    'COST': ('Costco Wholesale', 'Consumer Staples'),
+    'WMT': ('Walmart Inc.', 'Consumer Staples'),
+    'PM': ('Philip Morris', 'Consumer Staples'),
+    'MO': ('Altria Group', 'Consumer Staples'),
+    'MDLZ': ('Mondelez Intl', 'Consumer Staples'),
+    'CL': ('Colgate-Palmolive', 'Consumer Staples'),
+    'KMB': ('Kimberly-Clark', 'Consumer Staples'),
+    'GIS': ('General Mills', 'Consumer Staples'),
+    'KHC': ('Kraft Heinz', 'Consumer Staples'),
+    'SYY': ('Sysco Corp.', 'Consumer Staples'),
+    'STZ': ('Constellation Brands', 'Consumer Staples'),
+    'K': ('Kellanova', 'Consumer Staples'),
+
+    # Industrials
+    'CAT': ('Caterpillar Inc.', 'Industrials'),
+    'BA': ('Boeing Co.', 'Industrials'),
+    'HON': ('Honeywell Intl', 'Industrials'),
+    'UPS': ('United Parcel Service', 'Industrials'),
+    'RTX': ('RTX Corp.', 'Industrials'),
+    'GE': ('GE Aerospace', 'Industrials'),
+    'DE': ('Deere & Co.', 'Industrials'),
+    'LMT': ('Lockheed Martin', 'Industrials'),
+    'UNP': ('Union Pacific', 'Industrials'),
+    'MMM': ('3M Company', 'Industrials'),
+    'FDX': ('FedEx Corp.', 'Industrials'),
+    'NOC': ('Northrop Grumman', 'Industrials'),
+    'GD': ('General Dynamics', 'Industrials'),
+    'CSX': ('CSX Corp.', 'Industrials'),
+    'EMR': ('Emerson Electric', 'Industrials'),
+
+    # Energy
+    'XOM': ('Exxon Mobil', 'Energy'),
+    'CVX': ('Chevron Corp.', 'Energy'),
+    'COP': ('ConocoPhillips', 'Energy'),
+    'SLB': ('Schlumberger', 'Energy'),
+    'EOG': ('EOG Resources', 'Energy'),
+    'MPC': ('Marathon Petroleum', 'Energy'),
+    'PSX': ('Phillips 66', 'Energy'),
+    'VLO': ('Valero Energy', 'Energy'),
+    'OXY': ('Occidental Petroleum', 'Energy'),
+    'WMB': ('Williams Companies', 'Energy'),
+    'KMI': ('Kinder Morgan', 'Energy'),
+    'HAL': ('Halliburton', 'Energy'),
+    'DVN': ('Devon Energy', 'Energy'),
+    'BKR': ('Baker Hughes', 'Energy'),
+    'FANG': ('Diamondback Energy', 'Energy'),
+
+    # Communication Services
+    'DIS': ('Walt Disney', 'Communication Services'),
+    'NFLX': ('Netflix Inc.', 'Communication Services'),
+    'CMCSA': ('Comcast Corp.', 'Communication Services'),
+    'VZ': ('Verizon Comm.', 'Communication Services'),
+    'T': ('AT&T Inc.', 'Communication Services'),
+    'TMUS': ('T-Mobile US', 'Communication Services'),
+    'CHTR': ('Charter Comm.', 'Communication Services'),
+    'EA': ('Electronic Arts', 'Communication Services'),
+    'WBD': ('Warner Bros Discovery', 'Communication Services'),
+    'TTWO': ('Take-Two Interactive', 'Communication Services'),
+    'OMC': ('Omnicom Group', 'Communication Services'),
+    'IPG': ('Interpublic Group', 'Communication Services'),
+    'PARA': ('Paramount Global', 'Communication Services'),
+    'FOX': ('Fox Corp.', 'Communication Services'),
+    'MTCH': ('Match Group', 'Communication Services'),
+
+    # Materials
+    'LIN': ('Linde PLC', 'Materials'),
+    'APD': ('Air Products', 'Materials'),
+    'SHW': ('Sherwin-Williams', 'Materials'),
+    'ECL': ('Ecolab Inc.', 'Materials'),
+    'FCX': ('Freeport-McMoRan', 'Materials'),
+    'NEM': ('Newmont Corp.', 'Materials'),
+    'NUE': ('Nucor Corp.', 'Materials'),
+    'DOW': ('Dow Inc.', 'Materials'),
+    'DD': ('DuPont', 'Materials'),
+    'PPG': ('PPG Industries', 'Materials'),
+    'VMC': ('Vulcan Materials', 'Materials'),
+    'MLM': ('Martin Marietta', 'Materials'),
+    'ALB': ('Albemarle Corp.', 'Materials'),
+    'CTVA': ('Corteva Inc.', 'Materials'),
+    'IFF': ('Intl Flavors', 'Materials'),
+
+    # Real Estate
+    'AMT': ('American Tower', 'Real Estate'),
+    'PLD': ('Prologis Inc.', 'Real Estate'),
+    'CCI': ('Crown Castle', 'Real Estate'),
+    'EQIX': ('Equinix Inc.', 'Real Estate'),
+    'PSA': ('Public Storage', 'Real Estate'),
+    'WELL': ('Welltower Inc.', 'Real Estate'),
+    'SPG': ('Simon Property', 'Real Estate'),
+    'DLR': ('Digital Realty', 'Real Estate'),
+    'O': ('Realty Income', 'Real Estate'),
+    'VICI': ('VICI Properties', 'Real Estate'),
+    'AVB': ('AvalonBay Comm.', 'Real Estate'),
+    'EQR': ('Equity Residential', 'Real Estate'),
+    'WY': ('Weyerhaeuser', 'Real Estate'),
+    'ARE': ('Alexandria RE', 'Real Estate'),
+    'MAA': ('Mid-America Apt', 'Real Estate'),
+
+    # Utilities
+    'NEE': ('NextEra Energy', 'Utilities'),
+    'DUK': ('Duke Energy', 'Utilities'),
+    'SO': ('Southern Company', 'Utilities'),
+    'D': ('Dominion Energy', 'Utilities'),
+    'AEP': ('American Electric', 'Utilities'),
+    'SRE': ('Sempra Energy', 'Utilities'),
+    'EXC': ('Exelon Corp.', 'Utilities'),
+    'XEL': ('Xcel Energy', 'Utilities'),
+    'PCG': ('PG&E Corp.', 'Utilities'),
+    'WEC': ('WEC Energy', 'Utilities'),
+    'ED': ('Consolidated Edison', 'Utilities'),
+    'EIX': ('Edison Intl', 'Utilities'),
+    'AWK': ('American Water', 'Utilities'),
+    'DTE': ('DTE Energy', 'Utilities'),
+    'AEE': ('Ameren Corp.', 'Utilities'),
+}
+
+
+def get_fallback_tickers():
+    """Get fallback ticker list when web scraping fails"""
+    data = []
+    for ticker, (name, sector) in FALLBACK_TICKERS.items():
+        data.append({
+            'ticker': ticker,
+            'name': name,
+            'sector': sector,
+            'sub_industry': '',
+            'index': 'S&P500'
+        })
+    return pd.DataFrame(data)
+
+
 def get_sp500_tickers():
     """Fetch S&P 500 tickers from Wikipedia"""
     url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
@@ -58,10 +268,18 @@ def get_combined_tickers():
     """Get combined unique tickers from S&P 500 and Nasdaq 100"""
     print("Fetching S&P 500 tickers...")
     sp500 = get_sp500_tickers()
-    sp500['index'] = 'S&P500'
 
     print("Fetching Nasdaq 100 tickers...")
     nasdaq = get_nasdaq100_tickers()
+
+    # Check if web scraping succeeded
+    if len(sp500) == 0 and len(nasdaq) == 0:
+        print("Web scraping failed. Using fallback ticker list...")
+        combined = get_fallback_tickers()
+        print(f"Loaded {len(combined)} tickers from fallback list")
+        return combined
+
+    sp500['index'] = 'S&P500'
     nasdaq['index'] = 'NASDAQ100'
 
     # Combine and remove duplicates, keeping S&P 500 info as priority

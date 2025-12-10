@@ -1,0 +1,45 @@
+======================================================================
+REGRESSION ANALYSIS REPORT
+Stock Performance Factor Analysis
+======================================================================
+
+1. OVERALL MARKET REGRESSION (OLS)
+--------------------------------------------------
+R-squared: 0.0317
+Adjusted R-squared: -0.0414
+F-statistic: 0.43 (p=0.8987)
+Observations: 115
+
+Significant Factors:
+
+Interpretation:
+
+
+2. SECTOR-SPECIFIC REGRESSIONS
+--------------------------------------------------
+
+
+3. MACHINE LEARNING MODELS
+--------------------------------------------------
+
+Model Performance (Test Set):
+  Lasso               : R²=-0.1148 | RMSE=0.1075 | CV R²=-0.0567
+  ElasticNet          : R²=-0.1594 | RMSE=0.1096 | CV R²=-0.0709
+  RandomForest        : R²=-0.1970 | RMSE=0.1114 | CV R²=-0.1577
+  Ridge               : R²=-0.2514 | RMSE=0.1139 | CV R²=-0.1565
+  GradientBoosting    : R²=-0.3738 | RMSE=0.1193 | CV R²=-0.5785
+
+Feature Importance (Average across models):
+  revenue_growth      : 0.1409
+  volatility          : 0.0558
+  price_to_book       : 0.0534
+  beta                : 0.0491
+  profit_margin       : 0.0404
+
+
+4. SECTOR OUTLOOK
+--------------------------------------------------
+
+======================================================================
+END OF REGRESSION REPORT
+======================================================================
