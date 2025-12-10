@@ -577,3 +577,407 @@ def create_all_plots(df, sector_metrics, output_dir='.'):
     plot_sector_boxplots(df, box_metrics, save_path=f'{output_dir}/sector_boxplots.png')
 
     print(f"  All plots saved to {output_dir}/")
+
+
+# =============================================================================
+# ADVANCED VISUALIZATION FUNCTIONS
+# =============================================================================
+
+def plot_quality_scores_dashboard(df, save_path=None):
+    """
+    Create dashboard showing quality scores (Z-Score, F-Score, Quality Score)
+    """
+    setup_plot_style()
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+
+    # 1. Altman Z-Score Distribution
+    if 'altman_z_score' in df.columns:
+        ax1 = axes[0, 0]
+        z_scores = df['altman_z_score'].dropna()
+        z_scores = z_scores[(z_scores > -5) & (z_scores < 10)]  # Remove outliers
+
+        colors = []
+        for z in z_scores:
+            if z > 2.99:
+                colors.append('green')
+            elif z > 1.81:
+                colors.append('yellow')
+            else:
+                colors.append('red')
+
+        ax1.hist(z_scores, bins=30, color='steelblue', edgecolor='white', alpha=0.7)
+        ax1.axvline(x=2.99, color='green', linestyle='--', label='Safe Zone (>2.99)')
+        ax1.axvline(x=1.81, color='orange', linestyle='--', label='Grey Zone (1.81-2.99)')
+        ax1.set_title('Altman Z-Score Distribution', fontweight='bold')
+        ax1.set_xlabel('Z-Score')
+        ax1.legend(fontsize=8)
+
+    # 2. Piotroski F-Score Distribution
+    if 'piotroski_f_score' in df.columns:
+        ax2 = axes[0, 1]
+        f_scores = df['piotroski_f_score'].dropna()
+        score_counts = f_scores.value_counts().sort_index()
+        colors = ['red' if x < 4 else ('yellow' if x < 7 else 'green') for x in score_counts.index]
+        ax2.bar(score_counts.index, score_counts.values, color=colors, edgecolor='white')
+        ax2.set_title('Piotroski F-Score Distribution', fontweight='bold')
+        ax2.set_xlabel('F-Score (0-9)')
+        ax2.set_ylabel('Number of Stocks')
+
+    # 3. Quality Score Distribution
+    if 'quality_score' in df.columns:
+        ax3 = axes[0, 2]
+        q_scores = df['quality_score'].dropna()
+        ax3.hist(q_scores, bins=20, color='steelblue', edgecolor='white', alpha=0.7)
+        ax3.axvline(x=q_scores.median(), color='red', linestyle='--', label=f'Median: {q_scores.median():.0f}')
+        ax3.set_title('Quality Score Distribution', fontweight='bold')
+        ax3.set_xlabel('Quality Score (0-100)')
+        ax3.legend()
+
+    # 4. Z-Score by Sector
+    if 'altman_z_score' in df.columns:
+        ax4 = axes[1, 0]
+        sector_z = df.groupby('sector')['altman_z_score'].median().sort_values()
+        colors = ['green' if z > 2.99 else ('yellow' if z > 1.81 else 'red') for z in sector_z]
+        sector_z.plot(kind='barh', ax=ax4, color=colors)
+        ax4.axvline(x=2.99, color='green', linestyle='--', alpha=0.5)
+        ax4.axvline(x=1.81, color='orange', linestyle='--', alpha=0.5)
+        ax4.set_title('Median Z-Score by Sector', fontweight='bold')
+
+    # 5. F-Score by Sector
+    if 'piotroski_f_score' in df.columns:
+        ax5 = axes[1, 1]
+        sector_f = df.groupby('sector')['piotroski_f_score'].median().sort_values()
+        colors = ['red' if f < 4 else ('yellow' if f < 7 else 'green') for f in sector_f]
+        sector_f.plot(kind='barh', ax=ax5, color=colors)
+        ax5.set_title('Median F-Score by Sector', fontweight='bold')
+
+    # 6. Quality vs Valuation Scatter
+    if 'quality_score' in df.columns and 'forward_pe' in df.columns:
+        ax6 = axes[1, 2]
+        valid = df[['quality_score', 'forward_pe', 'sector']].dropna()
+        valid = valid[valid['forward_pe'] < valid['forward_pe'].quantile(0.95)]
+
+        for sector in valid['sector'].unique():
+            sector_data = valid[valid['sector'] == sector]
+            ax6.scatter(sector_data['forward_pe'], sector_data['quality_score'],
+                       alpha=0.6, s=30, label=sector)
+        ax6.set_xlabel('Forward P/E')
+        ax6.set_ylabel('Quality Score')
+        ax6.set_title('Quality Score vs Valuation', fontweight='bold')
+        ax6.legend(fontsize=7, loc='best', ncol=2)
+
+    plt.suptitle('Composite Quality Scores Analysis', fontsize=16, fontweight='bold')
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=150)
+        plt.close()
+    return fig
+
+
+def plot_performance_metrics_dashboard(df, save_path=None):
+    """
+    Create dashboard showing performance metrics (Sharpe, Sortino, Drawdown)
+    """
+    setup_plot_style()
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+
+    # 1. Sharpe Ratio Distribution
+    if 'sharpe_ratio' in df.columns or 'sharpe_approx' in df.columns:
+        ax1 = axes[0, 0]
+        sharpe_col = 'sharpe_ratio' if 'sharpe_ratio' in df.columns else 'sharpe_approx'
+        sharpe = df[sharpe_col].dropna()
+        sharpe = sharpe[(sharpe > -3) & (sharpe < 5)]  # Remove outliers
+        ax1.hist(sharpe, bins=30, color='steelblue', edgecolor='white', alpha=0.7)
+        ax1.axvline(x=0, color='red', linestyle='--', label='Break-even')
+        ax1.axvline(x=1, color='green', linestyle='--', label='Good (>1)')
+        ax1.set_title('Sharpe Ratio Distribution', fontweight='bold')
+        ax1.set_xlabel('Sharpe Ratio')
+        ax1.legend()
+
+    # 2. Max Drawdown Distribution
+    if 'max_drawdown' in df.columns:
+        ax2 = axes[0, 1]
+        dd = df['max_drawdown'].dropna() * 100
+        dd = dd[dd > -80]  # Remove extreme outliers
+        ax2.hist(dd, bins=30, color='red', edgecolor='white', alpha=0.7)
+        ax2.axvline(x=dd.median(), color='black', linestyle='--', label=f'Median: {dd.median():.1f}%')
+        ax2.set_title('Max Drawdown Distribution', fontweight='bold')
+        ax2.set_xlabel('Max Drawdown (%)')
+        ax2.legend()
+
+    # 3. Volatility Distribution
+    if 'volatility' in df.columns:
+        ax3 = axes[0, 2]
+        vol = df['volatility'].dropna() * 100
+        vol = vol[vol < vol.quantile(0.98)]
+        ax3.hist(vol, bins=30, color='orange', edgecolor='white', alpha=0.7)
+        ax3.axvline(x=vol.median(), color='black', linestyle='--', label=f'Median: {vol.median():.1f}%')
+        ax3.set_title('Annualized Volatility Distribution', fontweight='bold')
+        ax3.set_xlabel('Volatility (%)')
+        ax3.legend()
+
+    # 4. Sharpe by Sector
+    if 'sharpe_ratio' in df.columns or 'sharpe_approx' in df.columns:
+        ax4 = axes[1, 0]
+        sharpe_col = 'sharpe_ratio' if 'sharpe_ratio' in df.columns else 'sharpe_approx'
+        sector_sharpe = df.groupby('sector')[sharpe_col].median().sort_values()
+        colors = ['green' if s > 0.5 else ('yellow' if s > 0 else 'red') for s in sector_sharpe]
+        sector_sharpe.plot(kind='barh', ax=ax4, color=colors)
+        ax4.axvline(x=0, color='black', linestyle='-', linewidth=0.5)
+        ax4.set_title('Median Sharpe Ratio by Sector', fontweight='bold')
+
+    # 5. Max Drawdown by Sector
+    if 'max_drawdown' in df.columns:
+        ax5 = axes[1, 1]
+        sector_dd = df.groupby('sector')['max_drawdown'].median().sort_values(ascending=False) * 100
+        colors = plt.cm.RdYlGn(np.linspace(0.2, 0.8, len(sector_dd)))
+        sector_dd.plot(kind='barh', ax=ax5, color=colors)
+        ax5.set_title('Median Max Drawdown by Sector', fontweight='bold')
+        ax5.set_xlabel('Max Drawdown (%)')
+
+    # 6. Risk-Return Efficient Frontier
+    ax6 = axes[1, 2]
+    if 'volatility' in df.columns and '1y_return' in df.columns:
+        valid = df[['volatility', '1y_return', 'sector']].dropna()
+        valid = valid[(valid['volatility'] < valid['volatility'].quantile(0.95)) &
+                      (valid['1y_return'].abs() < 2)]
+
+        for sector in valid['sector'].unique():
+            sector_data = valid[valid['sector'] == sector]
+            ax6.scatter(sector_data['volatility'] * 100, sector_data['1y_return'] * 100,
+                       alpha=0.5, s=20, label=sector)
+
+        ax6.set_xlabel('Volatility (%)')
+        ax6.set_ylabel('1Y Return (%)')
+        ax6.set_title('Risk-Return by Stock', fontweight='bold')
+        ax6.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+        ax6.legend(fontsize=6, loc='best', ncol=2)
+
+    plt.suptitle('Performance Metrics Analysis', fontsize=16, fontweight='bold')
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=150)
+        plt.close()
+    return fig
+
+
+def plot_technical_overview(df, save_path=None):
+    """
+    Create dashboard showing technical indicators summary
+    """
+    setup_plot_style()
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+
+    # 1. RSI Distribution
+    if 'rsi' in df.columns:
+        ax1 = axes[0, 0]
+        rsi = df['rsi'].dropna()
+        colors = ['green' if r < 30 else ('red' if r > 70 else 'gray') for r in rsi]
+        ax1.hist(rsi, bins=30, color='steelblue', edgecolor='white', alpha=0.7)
+        ax1.axvline(x=30, color='green', linestyle='--', label='Oversold (<30)')
+        ax1.axvline(x=70, color='red', linestyle='--', label='Overbought (>70)')
+        ax1.axvspan(30, 70, alpha=0.1, color='gray')
+        ax1.set_title('RSI Distribution', fontweight='bold')
+        ax1.set_xlabel('RSI')
+        ax1.legend()
+
+    # 2. RSI by Sector
+    if 'rsi' in df.columns:
+        ax2 = axes[0, 1]
+        sector_rsi = df.groupby('sector')['rsi'].median().sort_values()
+        colors = ['green' if r < 40 else ('red' if r > 60 else 'gray') for r in sector_rsi]
+        sector_rsi.plot(kind='barh', ax=ax2, color=colors)
+        ax2.axvline(x=50, color='black', linestyle='--', alpha=0.5)
+        ax2.set_title('Median RSI by Sector', fontweight='bold')
+
+    # 3. Price vs 200 SMA
+    if 'price_vs_sma_200' in df.columns:
+        ax3 = axes[0, 2]
+        pct_above = (df['price_vs_sma_200'] > 0).mean() * 100
+        pct_below = 100 - pct_above
+        ax3.pie([pct_above, pct_below],
+                labels=[f'Above 200 SMA\n({pct_above:.1f}%)', f'Below 200 SMA\n({pct_below:.1f}%)'],
+                colors=['green', 'red'], autopct='', startangle=90)
+        ax3.set_title('Stocks vs 200-Day SMA', fontweight='bold')
+
+    # 4. Technical Signal Distribution
+    if 'technical_signal' in df.columns:
+        ax4 = axes[1, 0]
+        signal_counts = df['technical_signal'].value_counts()
+        order = ['Strong Buy', 'Buy', 'Neutral', 'Sell', 'Strong Sell']
+        signal_counts = signal_counts.reindex([s for s in order if s in signal_counts.index])
+        colors = ['darkgreen', 'lightgreen', 'gray', 'orange', 'red'][:len(signal_counts)]
+        signal_counts.plot(kind='bar', ax=ax4, color=colors, edgecolor='white')
+        ax4.set_title('Technical Signal Distribution', fontweight='bold')
+        ax4.tick_params(axis='x', rotation=45)
+
+    # 5. Volume Ratio Distribution
+    if 'volume_ratio' in df.columns:
+        ax5 = axes[1, 1]
+        vol_ratio = df['volume_ratio'].dropna()
+        vol_ratio = vol_ratio[vol_ratio < vol_ratio.quantile(0.98)]
+        ax5.hist(vol_ratio, bins=30, color='steelblue', edgecolor='white', alpha=0.7)
+        ax5.axvline(x=1, color='black', linestyle='--', label='Average Volume')
+        ax5.axvline(x=1.5, color='orange', linestyle='--', label='High Volume (1.5x)')
+        ax5.set_title('Volume Ratio Distribution', fontweight='bold')
+        ax5.set_xlabel('Volume vs 20-Day Avg')
+        ax5.legend()
+
+    # 6. ADX Trend Strength
+    if 'adx' in df.columns:
+        ax6 = axes[1, 2]
+        adx = df['adx'].dropna()
+        adx = adx[adx < 100]
+        ax6.hist(adx, bins=30, color='purple', edgecolor='white', alpha=0.7)
+        ax6.axvline(x=25, color='orange', linestyle='--', label='Strong Trend (>25)')
+        ax6.axvline(x=50, color='red', linestyle='--', label='Very Strong (>50)')
+        ax6.set_title('ADX Distribution (Trend Strength)', fontweight='bold')
+        ax6.set_xlabel('ADX')
+        ax6.legend()
+
+    plt.suptitle('Technical Indicators Overview', fontsize=16, fontweight='bold')
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=150)
+        plt.close()
+    return fig
+
+
+def plot_multi_factor_radar(df, ticker, metrics, save_path=None):
+    """
+    Create radar/spider chart for multi-factor comparison
+    """
+    setup_plot_style()
+
+    # Get stock data
+    stock = df[df['ticker'] == ticker]
+    if len(stock) == 0:
+        return None
+
+    stock = stock.iloc[0]
+
+    # Get sector for comparison
+    sector = stock['sector']
+    sector_median = df[df['sector'] == sector][metrics].median()
+
+    # Normalize values to 0-100 percentile within dataset
+    percentiles = {}
+    for metric in metrics:
+        if pd.notna(stock.get(metric)):
+            percentiles[metric] = (df[metric] < stock[metric]).mean() * 100
+        else:
+            percentiles[metric] = 50
+
+    # Create radar chart
+    angles = np.linspace(0, 2 * np.pi, len(metrics), endpoint=False).tolist()
+    angles += angles[:1]  # Complete the circle
+
+    values = [percentiles[m] for m in metrics]
+    values += values[:1]
+
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
+
+    ax.plot(angles, values, 'o-', linewidth=2, color='blue', label=ticker)
+    ax.fill(angles, values, alpha=0.25, color='blue')
+
+    # Add 50th percentile reference
+    ref_values = [50] * len(metrics) + [50]
+    ax.plot(angles, ref_values, '--', linewidth=1, color='gray', label='Market Median')
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels([m.replace('_', '\n').title() for m in metrics], size=9)
+    ax.set_ylim(0, 100)
+    ax.set_title(f'{ticker} Multi-Factor Analysis\n(Percentile Rank)', fontweight='bold', size=14)
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=150)
+        plt.close()
+    return fig
+
+
+def plot_sector_performance_heatmap(df, save_path=None):
+    """
+    Create heatmap showing sector performance across multiple timeframes
+    """
+    setup_plot_style()
+
+    return_cols = ['1w_return', '1m_return', '3m_return', '6m_return', '1y_return']
+    available_cols = [c for c in return_cols if c in df.columns]
+
+    if len(available_cols) == 0:
+        return None
+
+    # Calculate sector medians
+    sector_returns = df.groupby('sector')[available_cols].median() * 100
+
+    # Rename columns for display
+    col_names = {
+        '1w_return': '1 Week',
+        '1m_return': '1 Month',
+        '3m_return': '3 Months',
+        '6m_return': '6 Months',
+        '1y_return': '1 Year'
+    }
+    sector_returns.columns = [col_names.get(c, c) for c in sector_returns.columns]
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    sns.heatmap(sector_returns, annot=True, fmt='.1f', cmap='RdYlGn',
+                center=0, linewidths=0.5, ax=ax,
+                cbar_kws={'label': 'Return (%)'})
+
+    ax.set_title('Sector Performance Heatmap', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Time Period')
+    ax.set_ylabel('Sector')
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=150)
+        plt.close()
+    return fig
+
+
+def create_comprehensive_plots(df, sector_metrics, output_dir='.'):
+    """Generate all comprehensive analysis plots"""
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+
+    print("\nGenerating comprehensive visualizations...")
+
+    # Original plots
+    create_all_plots(df, sector_metrics, output_dir)
+
+    # Additional comprehensive plots
+    print("  - Quality scores dashboard...")
+    try:
+        plot_quality_scores_dashboard(df, save_path=f'{output_dir}/quality_scores_dashboard.png')
+    except Exception as e:
+        print(f"    Warning: Could not create quality scores dashboard: {e}")
+
+    print("  - Performance metrics dashboard...")
+    try:
+        plot_performance_metrics_dashboard(df, save_path=f'{output_dir}/performance_dashboard.png')
+    except Exception as e:
+        print(f"    Warning: Could not create performance dashboard: {e}")
+
+    print("  - Technical overview...")
+    try:
+        plot_technical_overview(df, save_path=f'{output_dir}/technical_overview.png')
+    except Exception as e:
+        print(f"    Warning: Could not create technical overview: {e}")
+
+    print("  - Sector performance heatmap...")
+    try:
+        plot_sector_performance_heatmap(df, save_path=f'{output_dir}/sector_performance_heatmap.png')
+    except Exception as e:
+        print(f"    Warning: Could not create sector performance heatmap: {e}")
+
+    print(f"\n  All comprehensive plots saved to {output_dir}/")
