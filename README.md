@@ -28,6 +28,27 @@ This system provides institutional-grade stock analysis capabilities:
 
 ---
 
+## Example Outputs
+
+See what the analysis system produces - comprehensive visualizations that reveal market insights at a glance:
+
+### Risk-Return Analysis by Sector
+Interactive bubble chart showing volatility vs. returns across all sectors, with bubble size representing market cap:
+
+![Risk-Return Analysis](output/risk_return_scatter.png)
+
+### Comprehensive Sector Dashboard
+Multi-panel dashboard comparing sectors by market cap, P/E ratios, ROE, returns distribution, debt levels, and more:
+
+![Sector Comparison Dashboard](output/sector_comparison.png)
+
+### Valuation Analysis Dashboard
+In-depth valuation breakdown showing score distributions, sector valuations, and forward P/E correlations:
+
+![Valuation Analysis](output/valuation_distribution.png)
+
+---
+
 ## Features
 
 ### 1. Price & Performance Metrics (Absolute)
