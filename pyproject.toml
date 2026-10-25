@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sector-analysis"
+version = "0.1.0"
+description = "Sector and stock analysis for S&P 500 and NASDAQ 100 constituents"
+readme = "README.md"
+requires-python = ">=3.8"
+dynamic = ["dependencies"]
+
+[project.scripts]
+sector-analysis = "sector_analysis.main:main"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]

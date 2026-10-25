@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Sector Analysis - Main Runner Script
 =====================================
@@ -27,31 +26,31 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Import local modules
-from data_fetcher import get_combined_tickers, fetch_all_data, fetch_market_data
-from fundamental_analysis import (
+from .data_fetcher import get_combined_tickers, fetch_all_data, fetch_market_data
+from .fundamental_analysis import (
     analyze_fundamentals, get_top_picks_by_sector,
     get_sector_comparison, RATING_CATEGORIES
 )
-from advanced_metrics import (
+from .advanced_metrics import (
     calculate_all_performance_metrics, calculate_all_fundamental_metrics,
     calculate_altman_z_score, calculate_piotroski_f_score,
     calculate_composite_quality_score
 )
-from comprehensive_metrics import (
+from .comprehensive_metrics import (
     PerformanceMetrics, RelativePerformanceMetrics,
     CompositeScores, calculate_all_metrics,
     calculate_sector_percentiles, calculate_sector_relative
 )
-from technical_analysis import (
+from .technical_analysis import (
     calculate_all_technicals, get_technical_signal,
     calculate_seasonality, calculate_fear_greed_indicators
 )
-from visualization import create_all_plots, create_comprehensive_plots
-from regression_models import (
+from .visualization import create_all_plots, create_comprehensive_plots
+from .regression_models import (
     generate_regression_report, predict_future_performance,
     train_ml_models
 )
-from demo_data import generate_demo_dataset
+from .demo_data import generate_demo_dataset
 
 
 def print_banner():
