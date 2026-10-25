@@ -1,20 +1,22 @@
 # Comprehensive Sector Analysis System
 
-A professional-grade Python application for analyzing S&P 500 and NASDAQ 100 stocks with **150+ financial metrics**, advanced technical analysis, composite quality scores, and machine learning predictions.
+A Python application for analyzing S&P 500 and NASDAQ 100 stocks with **150+ financial metrics**, advanced technical analysis, composite quality scores, and machine learning predictions. It rates every stock against its sector, aggregates sector statistics, and writes CSV reports and charts; a demo mode with simulated data runs without internet access.
 
-## Table of Contents
+## Contents
 
 - [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
+- [Example Outputs](#example-outputs)
 - [Metrics Reference](#metrics-reference)
+- [Installation](#installation)
+- [Usage](#usage)
 - [Output Files](#output-files)
 - [Visualizations](#visualizations)
-- [Architecture](#architecture)
-- [Advanced Usage](#advanced-usage)
-
----
+- [Rating System](#rating-system)
+- [Sectors Covered](#sectors-covered)
+- [Project Structure](#project-structure)
+- [Performance Notes](#performance-notes)
+- [Disclaimer](#disclaimer)
+- [License](#license)
 
 ## Overview
 
@@ -25,8 +27,6 @@ This system provides institutional-grade stock analysis capabilities:
 - **150+ Metrics**: Fundamental, technical, performance, and composite scores
 - **Machine Learning**: 5 ML models for performance predictions
 - **Comprehensive Visualizations**: 15+ chart types including heatmaps, scatter plots, dashboards
-
----
 
 ## Example Outputs
 
@@ -47,9 +47,7 @@ In-depth valuation breakdown showing score distributions, sector valuations, and
 
 ![Valuation Analysis](output/valuation_distribution.png)
 
----
-
-## Features
+## Metrics Reference
 
 ### 1. Price & Performance Metrics (Absolute)
 
@@ -263,66 +261,75 @@ Combines profitability, financial strength, growth, and valuation factors into a
 | **Earnings Momentum** | Post-earnings price patterns |
 | **Relative Strength** | Performance vs benchmark over time |
 
----
-
 ## Installation
 
 ### Requirements
+
 - Python 3.8+
 - pip package manager
 
 ### Setup
+
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/Sector-Analysis.git
+git clone https://github.com/grzresearch/Sector-Analysis.git
 cd Sector-Analysis
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the package and its dependencies (from requirements.txt)
+pip install -e .
 ```
+
+To install only the dependencies without the package, use `pip install -r requirements.txt` and run the analysis with `PYTHONPATH=src python -m sector_analysis`.
 
 ### Dependencies
+
 ```
-yfinance>=0.2.28      # Stock data API
-pandas>=2.0.0         # Data manipulation
-numpy>=1.24.0         # Numerical computing
-matplotlib>=3.7.0     # Visualization
-seaborn>=0.12.0       # Statistical plots
-scipy>=1.10.0         # Scientific computing
-statsmodels>=0.14.0   # Statistical modeling
-scikit-learn>=1.3.0   # Machine learning
-requests>=2.31.0      # HTTP library
+yfinance>=0.2.28       # Stock data API
+pandas>=2.0.0          # Data manipulation
+numpy>=1.24.0          # Numerical computing
+matplotlib>=3.7.0      # Visualization
+seaborn>=0.12.0        # Statistical plots
+scipy>=1.10.0          # Scientific computing
+statsmodels>=0.14.0    # Statistical modeling
+scikit-learn>=1.3.0    # Machine learning
+requests>=2.31.0       # HTTP library
 beautifulsoup4>=4.12.0 # Web scraping
-lxml>=4.9.0           # XML/HTML parser
-tqdm>=4.65.0          # Progress bars
+lxml>=4.9.0            # XML/HTML parser
+tqdm>=4.65.0           # Progress bars
 ```
 
----
+## Usage
 
-## Quick Start
+Run the commands from the repository root. Results are written to `output/` by default, which replaces the example files committed there.
 
 ### Run Full Analysis (All Stocks)
+
 ```bash
-cd src
-python main.py --output ../output
+sector-analysis
 ```
 
 ### Run Demo Mode (No Internet Required)
+
 ```bash
-python main.py --demo --output ../output
+sector-analysis --demo
 ```
 
 ### Run Sample Analysis (Faster)
+
 ```bash
-python main.py --sample 50 --output ../output
+sector-analysis --sample 50
 ```
 
 ### Run Basic Analysis (Fewer Metrics)
+
 ```bash
-python main.py --basic --output ../output
+sector-analysis --basic
 ```
 
+`python -m sector_analysis` accepts the same options as the `sector-analysis` command.
+
 ### Command Line Options
+
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--sample N` / `-s N` | Analyze only N stocks | All stocks |
@@ -331,7 +338,59 @@ python main.py --basic --output ../output
 | `--demo` / `-d` | Use simulated demo data | False |
 | `--basic` / `-b` | Run basic analysis only | False (comprehensive) |
 
----
+### Programmatic Access
+
+```python
+from sector_analysis.main import run_analysis
+
+# Run analysis and get results
+df, sector_metrics = run_analysis(
+    sample_size=100,
+    output_dir='my_output',
+    skip_plots=False,
+    demo_mode=False,
+    comprehensive=True
+)
+
+# Access results
+print(df['ticker'].tolist())
+print(df[df['valuation_rating'] == 1])  # Strongly undervalued
+```
+
+### Custom Metric Calculation
+
+```python
+from sector_analysis.comprehensive_metrics import (
+    PerformanceMetrics, CompositeScores
+)
+
+# Calculate Sharpe Ratio
+returns = df['returns']
+sharpe = PerformanceMetrics.sharpe_ratio(returns, risk_free_rate=0.04)
+
+# Calculate Z-Score
+z_score = CompositeScores.altman_z_score(
+    working_capital=1000000,
+    total_assets=5000000,
+    retained_earnings=500000,
+    ebit=300000,
+    market_cap=10000000,
+    total_liabilities=2000000,
+    revenue=8000000
+)
+```
+
+### Adding New Metrics
+```python
+# In src/sector_analysis/comprehensive_metrics.py, add to the appropriate class:
+class ValuationMetrics:
+    @staticmethod
+    def my_custom_ratio(metric_a, metric_b):
+        """Custom valuation ratio"""
+        if metric_b is None or metric_b == 0:
+            return np.nan
+        return metric_a / metric_b
+```
 
 ## Output Files
 
@@ -358,8 +417,6 @@ python main.py --basic --output ../output
 | `technical_overview.png` | RSI, MACD, ADX distribution |
 | `sector_performance_heatmap.png` | Returns by timeframe |
 
----
-
 ## Visualizations
 
 ### 1. Multi-Axis Charts
@@ -383,29 +440,68 @@ Outlier detection within peer groups.
 ### 7. Radar/Spider Charts
 Multi-factor comparison for individual stocks.
 
----
+## Rating System
 
-## Architecture
+### Valuation Ratings (1-5)
+| Rating | Category | Description |
+|--------|----------|-------------|
+| 1 | Strongly Undervalued | Top 20% value scores |
+| 2 | Undervalued | 20-40% value scores |
+| 3 | Fairly Valued | 40-60% value scores |
+| 4 | Overvalued | 60-80% value scores |
+| 5 | Strongly Overvalued | Bottom 20% value scores |
+
+### Performance Ratings (1-5)
+Based on excess returns, revenue growth, ROE, and momentum.
+
+### Technical Signals
+| Signal | Score Range | Description |
+|--------|-------------|-------------|
+| Strong Buy | 40+ | Multiple bullish indicators |
+| Buy | 20-40 | Net bullish bias |
+| Neutral | -20 to 20 | Mixed signals |
+| Sell | -40 to -20 | Net bearish bias |
+| Strong Sell | <-40 | Multiple bearish indicators |
+
+## Sectors Covered
+
+1. **Information Technology** - AAPL, MSFT, NVDA, etc.
+2. **Health Care** - JNJ, UNH, PFE, etc.
+3. **Financials** - JPM, BAC, WFC, etc.
+4. **Consumer Discretionary** - AMZN, TSLA, HD, etc.
+5. **Communication Services** - META, GOOGL, NFLX, etc.
+6. **Industrials** - CAT, BA, UPS, etc.
+7. **Consumer Staples** - PG, KO, WMT, etc.
+8. **Energy** - XOM, CVX, COP, etc.
+9. **Materials** - LIN, APD, SHW, etc.
+10. **Real Estate** - PLD, AMT, EQIX, etc.
+11. **Utilities** - NEE, DUK, SO, etc.
+
+## Project Structure
 
 ```
 Sector-Analysis/
 ├── src/
-│   ├── main.py                  # Main orchestrator
-│   ├── data_fetcher.py          # Data retrieval (S&P 500 + NASDAQ 100)
-│   ├── fundamental_analysis.py  # Valuation ratings & scoring
-│   ├── advanced_metrics.py      # Performance metrics
-│   ├── comprehensive_metrics.py # 150+ metrics implementation
-│   ├── technical_analysis.py    # Technical indicators
-│   ├── regression_models.py     # ML & OLS models
-│   ├── visualization.py         # Plotting functions
-│   ├── demo_data.py             # Simulated data generator
-│   └── __init__.py
-├── output/                      # Generated outputs
-├── requirements.txt             # Python dependencies
-└── README.md                    # This file
+│   └── sector_analysis/
+│       ├── __main__.py              # Entry point for python -m sector_analysis
+│       ├── main.py                  # Main orchestrator and CLI
+│       ├── data_fetcher.py          # Data retrieval (S&P 500 + NASDAQ 100)
+│       ├── fundamental_analysis.py  # Valuation ratings & scoring
+│       ├── advanced_metrics.py      # Performance metrics
+│       ├── comprehensive_metrics.py # 150+ metrics implementation
+│       ├── technical_analysis.py    # Technical indicators
+│       ├── regression_models.py     # ML & OLS models
+│       ├── visualization.py         # Plotting functions
+│       └── demo_data.py             # Simulated data generator
+├── output/                          # Example outputs (charts, CSV reports)
+├── pyproject.toml                   # Package metadata and console script
+├── requirements.txt                 # Python dependencies
+└── README.md
 ```
 
 ### Module Descriptions
+
+All modules live in `src/sector_analysis/`.
 
 #### data_fetcher.py
 - Fetches S&P 500 and NASDAQ 100 tickers from Wikipedia
@@ -440,105 +536,6 @@ Sector-Analysis/
 - Technical indicator overviews
 - Multi-factor radar charts
 
----
-
-## Advanced Usage
-
-### Programmatic Access
-```python
-from main import run_analysis
-
-# Run analysis and get results
-df, sector_metrics = run_analysis(
-    sample_size=100,
-    output_dir='my_output',
-    skip_plots=False,
-    demo_mode=False,
-    comprehensive=True
-)
-
-# Access results
-print(df['ticker'].tolist())
-print(df[df['valuation_rating'] == 1])  # Strongly undervalued
-```
-
-### Custom Metric Calculation
-```python
-from comprehensive_metrics import (
-    PerformanceMetrics, CompositeScores
-)
-
-# Calculate Sharpe Ratio
-returns = df['returns']
-sharpe = PerformanceMetrics.sharpe_ratio(returns, risk_free_rate=0.04)
-
-# Calculate Z-Score
-z_score = CompositeScores.altman_z_score(
-    working_capital=1000000,
-    total_assets=5000000,
-    retained_earnings=500000,
-    ebit=300000,
-    market_cap=10000000,
-    total_liabilities=2000000,
-    revenue=8000000
-)
-```
-
-### Adding New Metrics
-```python
-# In comprehensive_metrics.py, add to appropriate class:
-class ValuationMetrics:
-    @staticmethod
-    def my_custom_ratio(metric_a, metric_b):
-        """Custom valuation ratio"""
-        if metric_b is None or metric_b == 0:
-            return np.nan
-        return metric_a / metric_b
-```
-
----
-
-## Rating System
-
-### Valuation Ratings (1-5)
-| Rating | Category | Description |
-|--------|----------|-------------|
-| 1 | Strongly Undervalued | Top 20% value scores |
-| 2 | Undervalued | 20-40% value scores |
-| 3 | Fairly Valued | 40-60% value scores |
-| 4 | Overvalued | 60-80% value scores |
-| 5 | Strongly Overvalued | Bottom 20% value scores |
-
-### Performance Ratings (1-5)
-Based on excess returns, revenue growth, ROE, and momentum.
-
-### Technical Signals
-| Signal | Score Range | Description |
-|--------|-------------|-------------|
-| Strong Buy | 40+ | Multiple bullish indicators |
-| Buy | 20-40 | Net bullish bias |
-| Neutral | -20 to 20 | Mixed signals |
-| Sell | -40 to -20 | Net bearish bias |
-| Strong Sell | <-40 | Multiple bearish indicators |
-
----
-
-## Sectors Covered
-
-1. **Information Technology** - AAPL, MSFT, NVDA, etc.
-2. **Health Care** - JNJ, UNH, PFE, etc.
-3. **Financials** - JPM, BAC, WFC, etc.
-4. **Consumer Discretionary** - AMZN, TSLA, HD, etc.
-5. **Communication Services** - META, GOOGL, NFLX, etc.
-6. **Industrials** - CAT, BA, UPS, etc.
-7. **Consumer Staples** - PG, KO, WMT, etc.
-8. **Energy** - XOM, CVX, COP, etc.
-9. **Materials** - LIN, APD, SHW, etc.
-10. **Real Estate** - PLD, AMT, EQIX, etc.
-11. **Utilities** - NEE, DUK, SO, etc.
-
----
-
 ## Performance Notes
 
 - **Full Analysis**: ~10-15 minutes for all 500+ stocks
@@ -546,18 +543,14 @@ Based on excess returns, revenue growth, ROE, and momentum.
 - **Demo Mode**: <30 seconds (no API calls)
 - **Memory Usage**: ~500MB for full analysis
 
----
-
 ## Disclaimer
 
 This tool is for educational and research purposes only. It does not constitute investment advice. Always perform your own due diligence and consult with a qualified financial advisor before making investment decisions.
 
----
-
 ## License
 
-MIT License - See LICENSE file for details.
+MIT License.
 
 ## Contributing
 
-Contributions are welcome! Please submit pull requests or open issues for bugs and feature requests.
+Contributions are welcome. Please submit pull requests or open issues for bugs and feature requests.
