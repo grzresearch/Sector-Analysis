@@ -45,7 +45,7 @@ The analysis publishes a static, interactive dashboard to GitHub Pages: <https:/
 
 Selecting a stock anywhere opens its detail panel: price against the sector index, percentile bars against sector peers, analyst targets and every metric. Every view's state is kept in the address bar, so any chart or screen can be shared as a link.
 
-The dashboard is plain HTML, CSS and JavaScript modules in [`dashboard/`](dashboard/) with [Apache ECharts](https://echarts.apache.org/) for the charts; there is no build step. It reads the JSON files that `sector-analysis --dashboard-data` writes, and [`dashboard_data.py`](src/sector_analysis/dashboard_data.py) holds the metric catalog: a metric added there appears in every table, chart picker and the glossary.
+The dashboard is plain HTML, CSS and JavaScript modules in [`dashboard/`](dashboard/) with [Apache ECharts](https://echarts.apache.org/) for the charts; there is no build step. It reads the JSON files that `sector-analysis --dashboard-data` writes. [`dashboard_data.py`](src/sector_analysis/dashboard_data.py) holds the metric catalog (label, unit, which direction is favourable): a metric added there appears in the screener conditions, the Factor Lab pickers, the stock panel, the CSV export and the glossary, while the table column sets are chosen in `COLUMN_SETS` in [`components.js`](dashboard/assets/js/components.js).
 
 ### Preview it locally
 
@@ -57,7 +57,7 @@ python -m http.server 8000 --directory dashboard
 
 ### Publishing
 
-The [Dashboard workflow](.github/workflows/dashboard.yml) runs the full analysis on live data and deploys the site on every push to `main`, on weekdays after the US close, and on demand (*Actions → Dashboard → Run workflow*, optionally with a sample size or demo data). It keeps the previous deployment online when fewer than 80% of the stocks could be fetched. Pull requests build the site with demo data to check it without deploying.
+The [Dashboard workflow](.github/workflows/dashboard.yml) runs the full analysis on live data and deploys the site on every push to `main`, on weekdays after the US close, and on demand (*Actions → Dashboard → Run workflow*, optionally with a sample size or demo data). It keeps the previous deployment online when fewer than 80% of the stocks, or the S&P 500 benchmark, could be fetched. Pull requests build the site with demo data to check it without deploying.
 
 One-time setup: in the repository's *Settings → Pages*, set *Source* to **GitHub Actions**.
 

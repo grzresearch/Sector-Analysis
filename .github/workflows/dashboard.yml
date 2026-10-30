@@ -61,8 +61,9 @@ jobs:
         # A throttled data source must not replace a complete dashboard with a partial one
         if: github.event_name != 'pull_request' && !inputs.demo
         run: |
-          jq -e '.meta.universe.analyzed >= 0.8 * .meta.universe.size' build/site/data/dashboard.json > /dev/null || {
-            echo "::error::Less than 80% of the universe could be analysed; the current deployment stays online."
+          jq -e '.meta.universe.analyzed >= 0.8 * .meta.universe.size
+                 and (.history.benchmarks.SPY | length) > 0' build/site/data/dashboard.json > /dev/null || {
+            echo "::error::Fewer than 80% of the stocks or the S&P 500 benchmark could be fetched; the current deployment stays online."
             exit 1
           }
 
