@@ -25,6 +25,10 @@ GICS_SECTORS = {
     'Real Estate': 'Real Estate',
     'Utilities': 'Utilities',
     'Basic Materials': 'Materials',
+    # Yahoo Finance names for the remaining GICS sectors
+    'Financial Services': 'Financials',
+    'Consumer Cyclical': 'Consumer Discretionary',
+    'Consumer Defensive': 'Consumer Staples',
 }
 
 # Rating categories

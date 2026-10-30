@@ -51,6 +51,11 @@ from .regression_models import (
     train_ml_models
 )
 from .demo_data import generate_demo_dataset
+from .dashboard_data import export_dashboard_data
+
+
+# Sectors whose balance sheets the Altman Z-Score was not designed for
+ALTMAN_EXCLUDED_SECTORS = ['Financials', 'Real Estate', 'Utilities']
 
 
 def print_banner():
@@ -180,6 +185,13 @@ def calculate_quality_scores(df):
             return np.nan
 
     df['altman_z_score'] = df.apply(calc_z_score, axis=1)
+    # The model was built on industrial companies: leave it out where it does not apply,
+    # and where statements are in another currency than the market cap
+    not_applicable = df['sector'].isin(ALTMAN_EXCLUDED_SECTORS)
+    if {'currency', 'financial_currency'} <= set(df.columns):
+        not_applicable |= (df['financial_currency'].fillna('') != '') & (
+            df['financial_currency'] != df['currency'])
+    df.loc[not_applicable, 'altman_z_score'] = np.nan
     df['z_score_zone'] = df['altman_z_score'].apply(CompositeScores.interpret_z_score)
 
     # Piotroski F-Score
@@ -420,7 +432,7 @@ def print_summary_report(df, sector_metrics):
 
 
 def run_analysis(sample_size=None, output_dir='output', skip_plots=False,
-                 demo_mode=False, comprehensive=True):
+                 demo_mode=False, comprehensive=True, dashboard_dir=None):
     """
     Main analysis function
 
@@ -430,6 +442,7 @@ def run_analysis(sample_size=None, output_dir='output', skip_plots=False,
         skip_plots: Skip plot generation
         demo_mode: Use simulated data (for testing without internet)
         comprehensive: Run comprehensive analysis with all metrics
+        dashboard_dir: Also write the web dashboard's data files to this directory
     """
     print_banner()
 
@@ -448,12 +461,14 @@ def run_analysis(sample_size=None, output_dir='output', skip_plots=False,
         print("=" * 50)
         df = generate_demo_dataset()
         benchmark_data = None
+        universe_size = len(df)
     else:
         # Step 1: Fetch tickers
         print("\n" + "=" * 50)
         print("STEP 1: FETCHING STOCK TICKERS")
         print("=" * 50)
         tickers_df = get_combined_tickers()
+        universe_size = min(sample_size or len(tickers_df), len(tickers_df))
 
         # Step 2: Fetch fundamental data
         print("\n" + "=" * 50)
@@ -544,6 +559,18 @@ def run_analysis(sample_size=None, output_dir='output', skip_plots=False,
     save_sector_summary(df, sector_metrics, output_dir)
     save_top_picks(df, output_dir)
 
+    if dashboard_dir:
+        export_dashboard_data(
+            df, dashboard_dir,
+            price_histories=price_histories,
+            benchmark_data=benchmark_data,
+            ols_model=ols_model,
+            sector_models=sector_models,
+            ml_results=ml_results,
+            demo_mode=demo_mode,
+            universe_size=universe_size,
+        )
+
     # Print summary report
     print_summary_report(df, sector_metrics)
 
@@ -589,16 +616,23 @@ def main():
         '--basic', '-b', action='store_true',
         help='Run basic analysis only (faster, fewer metrics)'
     )
+    parser.add_argument(
+        '--dashboard-data', metavar='DIR', default=None,
+        help='Also write the data files of the web dashboard to DIR (e.g. dashboard/data)'
+    )
 
     args = parser.parse_args()
 
-    run_analysis(
+    result = run_analysis(
         sample_size=args.sample,
         output_dir=args.output,
         skip_plots=args.skip_plots,
         demo_mode=args.demo,
-        comprehensive=not args.basic
+        comprehensive=not args.basic,
+        dashboard_dir=args.dashboard_data
     )
+    if result is None:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

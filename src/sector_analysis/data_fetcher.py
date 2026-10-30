@@ -4,6 +4,7 @@ Fetches S&P 500 and NASDAQ 100 stock data using Yahoo Finance API
 Complete coverage of all index constituents with comprehensive fallback
 """
 
+import io
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -561,6 +562,19 @@ NASDAQ100_ONLY = {
 }
 
 
+# Wikipedia rejects requests that do not identify their client (HTTP 403)
+WIKIPEDIA_HEADERS = {
+    'User-Agent': 'sector-analysis (https://github.com/grzresearch/Sector-Analysis)'
+}
+
+
+def read_wikipedia_tables(url):
+    """Read all HTML tables of a Wikipedia page"""
+    response = requests.get(url, headers=WIKIPEDIA_HEADERS, timeout=30)
+    response.raise_for_status()
+    return pd.read_html(io.StringIO(response.text))
+
+
 def get_fallback_tickers():
     """Get comprehensive fallback ticker list when web scraping fails"""
     data = []
@@ -593,7 +607,7 @@ def get_sp500_tickers():
     """Fetch S&P 500 tickers from Wikipedia"""
     url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
     try:
-        tables = pd.read_html(url)
+        tables = read_wikipedia_tables(url)
         df = tables[0]
         df['Symbol'] = df['Symbol'].str.replace('.', '-', regex=False)
         result = df[['Symbol', 'Security', 'GICS Sector', 'GICS Sub-Industry']].rename(
@@ -607,11 +621,25 @@ def get_sp500_tickers():
         return pd.DataFrame()
 
 
+NASDAQ100_PAGES = [
+    'https://en.wikipedia.org/wiki/List_of_NASDAQ-100_companies',
+    'https://en.wikipedia.org/wiki/Nasdaq-100',
+]
+
+
 def get_nasdaq100_tickers():
     """Fetch Nasdaq 100 tickers from Wikipedia"""
-    url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
+    for url in NASDAQ100_PAGES:
+        tickers = get_nasdaq100_tickers_from(url)
+        if len(tickers) > 0:
+            return tickers
+    return pd.DataFrame()
+
+
+def get_nasdaq100_tickers_from(url):
+    """Read the Nasdaq 100 constituents table of one Wikipedia page"""
     try:
-        tables = pd.read_html(url)
+        tables = read_wikipedia_tables(url)
         # Find the table with tickers
         for table in tables:
             if 'Ticker' in table.columns or 'Symbol' in table.columns:
@@ -658,6 +686,15 @@ def get_combined_tickers():
         print(f"  - NASDAQ 100 (unique): {len([t for t in combined['index'] if t == 'NASDAQ100'])} stocks")
         return combined
 
+    # Fill an index whose scrape failed from the fallback list
+    fallback = get_fallback_tickers()
+    if len(sp500) == 0:
+        print("\n⚠ Using fallback S&P 500 list")
+        sp500 = fallback[fallback['index'] == 'S&P500'].drop(columns='index')
+    if len(nasdaq) == 0:
+        print("\n⚠ Using fallback NASDAQ 100 list")
+        nasdaq = fallback[fallback['index'] == 'NASDAQ100'].drop(columns='index')
+
     sp500['index'] = 'S&P500'
     nasdaq['index'] = 'NASDAQ100'
 
@@ -686,6 +723,11 @@ def fetch_fundamental_data(ticker, max_retries=3):
         try:
             stock = yf.Ticker(ticker)
             info = stock.info
+
+            # A throttled request returns an empty quote (no name, no market cap); without
+            # this check the stock would be kept with no fundamentals and hide the failure
+            if not (info.get('longName') or info.get('shortName') or info.get('marketCap')):
+                raise ValueError('empty quote data (throttled?)')
 
             # Get financial statements
             try:
@@ -722,6 +764,8 @@ def fetch_fundamental_data(ticker, max_retries=3):
                 'industry': info.get('industry', 'Unknown'),
                 'market_cap': info.get('marketCap', np.nan),
                 'enterprise_value': info.get('enterpriseValue', np.nan),
+                'currency': info.get('currency', ''),
+                'financial_currency': info.get('financialCurrency', ''),
                 'current_price': info.get('currentPrice', info.get('regularMarketPrice', np.nan)),
                 'shares_outstanding': info.get('sharesOutstanding', np.nan),
                 'float_shares': info.get('floatShares', np.nan),
@@ -762,7 +806,8 @@ def fetch_fundamental_data(ticker, max_retries=3):
                 'operating_cashflow': info.get('operatingCashflow', np.nan),
 
                 # Dividend
-                'dividend_yield': info.get('dividendYield', np.nan),
+                # Yahoo reports this field in percent (1.95 = 1.95%); store a fraction like every other ratio
+                'dividend_yield': pd.to_numeric(info.get('dividendYield'), errors='coerce') / 100,
                 'dividend_rate': info.get('dividendRate', np.nan),
                 'payout_ratio': info.get('payoutRatio', np.nan),
                 'five_year_avg_dividend_yield': info.get('fiveYearAvgDividendYield', np.nan),
@@ -814,7 +859,7 @@ def fetch_fundamental_data(ticker, max_retries=3):
 
         except Exception as e:
             if attempt < max_retries - 1:
-                time.sleep(1)
+                time.sleep(2 ** (attempt + 1))  # back off: 2s, 4s
             else:
                 return {'ticker': ticker, 'error': str(e)}
 
@@ -828,13 +873,13 @@ def extract_financial_statement_metrics(balance_sheet, income_stmt, cash_flow, i
     try:
         # Working Capital
         if not balance_sheet.empty:
-            current_assets = get_item(balance_sheet, ['Total Current Assets', 'CurrentAssets'])
-            current_liabilities = get_item(balance_sheet, ['Total Current Liabilities', 'CurrentLiabilities'])
+            current_assets = get_item(balance_sheet, ['Current Assets', 'Total Current Assets', 'CurrentAssets'])
+            current_liabilities = get_item(balance_sheet, ['Current Liabilities', 'Total Current Liabilities', 'CurrentLiabilities'])
             if current_assets and current_liabilities:
                 metrics['working_capital'] = current_assets - current_liabilities
 
             # Total Equity
-            total_equity = get_item(balance_sheet, ['Total Stockholder Equity', 'StockholdersEquity', 'Total Equity'])
+            total_equity = get_item(balance_sheet, ['Stockholders Equity', 'Total Stockholder Equity', 'StockholdersEquity', 'Total Equity'])
             if total_equity:
                 metrics['total_equity'] = total_equity
 
@@ -849,12 +894,17 @@ def extract_financial_statement_metrics(balance_sheet, income_stmt, cash_flow, i
                 metrics['inventory'] = inventory
 
             # Receivables
-            receivables = get_item(balance_sheet, ['Net Receivables', 'AccountsReceivable', 'Receivables'])
+            receivables = get_item(balance_sheet, ['Accounts Receivable', 'Receivables', 'Net Receivables', 'AccountsReceivable'])
             if receivables:
                 metrics['receivables'] = receivables
 
+            # Total Assets (not part of the info payload)
+            total_assets = get_item(balance_sheet, ['Total Assets', 'TotalAssets'])
+            if total_assets:
+                metrics['total_assets'] = total_assets
+
             # Total Liabilities
-            total_liabilities = get_item(balance_sheet, ['Total Liabilities', 'TotalLiabilities'])
+            total_liabilities = get_item(balance_sheet, ['Total Liabilities Net Minority Interest', 'Total Liabilities', 'TotalLiabilities'])
             if total_liabilities:
                 metrics['total_liabilities'] = total_liabilities
 
@@ -876,12 +926,12 @@ def extract_financial_statement_metrics(balance_sheet, income_stmt, cash_flow, i
                 metrics['cost_of_revenue'] = cogs
 
             # Research & Development
-            rd_expense = get_item(income_stmt, ['Research Development', 'ResearchAndDevelopment', 'R&D'])
+            rd_expense = get_item(income_stmt, ['Research And Development', 'Research Development', 'ResearchAndDevelopment', 'R&D'])
             if rd_expense:
                 metrics['rd_expense'] = rd_expense
 
             # SG&A
-            sga = get_item(income_stmt, ['Selling General Administrative', 'SellingGeneralAndAdministration'])
+            sga = get_item(income_stmt, ['Selling General And Administration', 'Selling General Administrative', 'SellingGeneralAndAdministration'])
             if sga:
                 metrics['sga_expense'] = sga
 
@@ -893,7 +943,7 @@ def extract_financial_statement_metrics(balance_sheet, income_stmt, cash_flow, i
                 metrics['capex'] = abs(capex)
 
             # Depreciation
-            depreciation = get_item(cash_flow, ['Depreciation', 'DepreciationAndAmortization'])
+            depreciation = get_item(cash_flow, ['Depreciation And Amortization', 'Depreciation', 'DepreciationAndAmortization'])
             if depreciation:
                 metrics['depreciation'] = depreciation
 
@@ -942,23 +992,17 @@ def fetch_historical_data(ticker, period='2y'):
             'recent_volume': hist['Volume'].iloc[-5:].mean(),
         }
 
-        # Returns at different timeframes
-        if len(hist) > 252:
-            data['1y_return'] = (current_price / hist['Close'].iloc[-252] - 1)
-        if len(hist) > 126:
-            data['6m_return'] = (current_price / hist['Close'].iloc[-126] - 1)
-        if len(hist) > 63:
-            data['3m_return'] = (current_price / hist['Close'].iloc[-63] - 1)
-        if len(hist) > 21:
-            data['1m_return'] = (current_price / hist['Close'].iloc[-21] - 1)
-        if len(hist) > 5:
-            data['1w_return'] = (current_price / hist['Close'].iloc[-5] - 1)
+        # Returns over the last N sessions: from the close N sessions ago
+        for key, sessions in [('1y_return', 252), ('6m_return', 126), ('3m_return', 63),
+                              ('1m_return', 21), ('1w_return', 5)]:
+            if len(hist) > sessions:
+                data[key] = current_price / hist['Close'].iloc[-(sessions + 1)] - 1
 
-        # YTD return
-        current_year = pd.Timestamp.now().year
-        ytd_start = hist[hist.index.year == current_year]
-        if len(ytd_start) > 0:
-            data['ytd_return'] = (current_price / ytd_start['Close'].iloc[0] - 1)
+        # YTD return: from the last close of the previous year
+        year = hist.index[-1].year
+        before = hist[hist.index.year < year]
+        if len(before) > 0:
+            data['ytd_return'] = current_price / before['Close'].iloc[-1] - 1
 
         # Volatility (annualized)
         data['volatility'] = returns.std() * np.sqrt(252)
@@ -993,20 +1037,26 @@ def fetch_historical_data(ticker, period='2y'):
         }
 
 
+BENCHMARK_SYMBOLS = [
+    'SPY', 'QQQ', '^VIX',
+    'TLT',  # Treasury bonds
+    'UUP',  # US Dollar
+    'USO',  # Oil
+]
+
+
 def fetch_market_data():
     """Fetch benchmark market data (SPY, QQQ, VIX, rates proxies)"""
-    try:
-        benchmarks = {
-            'SPY': yf.Ticker('SPY').history(period='2y'),
-            'QQQ': yf.Ticker('QQQ').history(period='2y'),
-            '^VIX': yf.Ticker('^VIX').history(period='2y'),
-            'TLT': yf.Ticker('TLT').history(period='2y'),  # Treasury bonds
-            'UUP': yf.Ticker('UUP').history(period='2y'),  # US Dollar
-            'USO': yf.Ticker('USO').history(period='2y'),  # Oil
-        }
-        return benchmarks
-    except:
-        return {}
+    benchmarks = {}
+    for symbol in BENCHMARK_SYMBOLS:
+        # One at a time, so a failed symbol does not take the others with it
+        try:
+            history = yf.Ticker(symbol).history(period='2y')
+        except Exception:
+            continue
+        if len(history) > 0:
+            benchmarks[symbol] = history
+    return benchmarks
 
 
 def fetch_all_data(tickers_df, sample_size=None, delay=0.05):
@@ -1054,9 +1104,12 @@ def fetch_all_data(tickers_df, sample_size=None, delay=0.05):
         fund_df, on='ticker', how='left', suffixes=('_orig', '')
     )
 
-    # Use sector from API if available, otherwise from original
+    # Use the GICS sector from the index constituents; Yahoo's own classification
+    # (which places e.g. ADP under Technology) only fills the gaps
     if 'sector_orig' in result.columns and 'sector' in result.columns:
-        result['sector'] = result['sector'].fillna(result['sector_orig'])
+        gics = result['sector_orig'].replace('', np.nan)
+        yahoo = result['sector'].replace({'Unknown': np.nan, '': np.nan})
+        result['sector'] = gics.fillna(yahoo).fillna('Unknown')
         result = result.drop(columns=['sector_orig'])
 
     # Merge returns
