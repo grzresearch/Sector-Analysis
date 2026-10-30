@@ -851,13 +851,13 @@ def extract_financial_statement_metrics(balance_sheet, income_stmt, cash_flow, i
     try:
         # Working Capital
         if not balance_sheet.empty:
-            current_assets = get_item(balance_sheet, ['Total Current Assets', 'CurrentAssets'])
-            current_liabilities = get_item(balance_sheet, ['Total Current Liabilities', 'CurrentLiabilities'])
+            current_assets = get_item(balance_sheet, ['Current Assets', 'Total Current Assets', 'CurrentAssets'])
+            current_liabilities = get_item(balance_sheet, ['Current Liabilities', 'Total Current Liabilities', 'CurrentLiabilities'])
             if current_assets and current_liabilities:
                 metrics['working_capital'] = current_assets - current_liabilities
 
             # Total Equity
-            total_equity = get_item(balance_sheet, ['Total Stockholder Equity', 'StockholdersEquity', 'Total Equity'])
+            total_equity = get_item(balance_sheet, ['Stockholders Equity', 'Total Stockholder Equity', 'StockholdersEquity', 'Total Equity'])
             if total_equity:
                 metrics['total_equity'] = total_equity
 
@@ -872,12 +872,17 @@ def extract_financial_statement_metrics(balance_sheet, income_stmt, cash_flow, i
                 metrics['inventory'] = inventory
 
             # Receivables
-            receivables = get_item(balance_sheet, ['Net Receivables', 'AccountsReceivable', 'Receivables'])
+            receivables = get_item(balance_sheet, ['Accounts Receivable', 'Receivables', 'Net Receivables', 'AccountsReceivable'])
             if receivables:
                 metrics['receivables'] = receivables
 
+            # Total Assets (not part of the info payload)
+            total_assets = get_item(balance_sheet, ['Total Assets', 'TotalAssets'])
+            if total_assets:
+                metrics['total_assets'] = total_assets
+
             # Total Liabilities
-            total_liabilities = get_item(balance_sheet, ['Total Liabilities', 'TotalLiabilities'])
+            total_liabilities = get_item(balance_sheet, ['Total Liabilities Net Minority Interest', 'Total Liabilities', 'TotalLiabilities'])
             if total_liabilities:
                 metrics['total_liabilities'] = total_liabilities
 
@@ -899,12 +904,12 @@ def extract_financial_statement_metrics(balance_sheet, income_stmt, cash_flow, i
                 metrics['cost_of_revenue'] = cogs
 
             # Research & Development
-            rd_expense = get_item(income_stmt, ['Research Development', 'ResearchAndDevelopment', 'R&D'])
+            rd_expense = get_item(income_stmt, ['Research And Development', 'Research Development', 'ResearchAndDevelopment', 'R&D'])
             if rd_expense:
                 metrics['rd_expense'] = rd_expense
 
             # SG&A
-            sga = get_item(income_stmt, ['Selling General Administrative', 'SellingGeneralAndAdministration'])
+            sga = get_item(income_stmt, ['Selling General And Administration', 'Selling General Administrative', 'SellingGeneralAndAdministration'])
             if sga:
                 metrics['sga_expense'] = sga
 
@@ -916,7 +921,7 @@ def extract_financial_statement_metrics(balance_sheet, income_stmt, cash_flow, i
                 metrics['capex'] = abs(capex)
 
             # Depreciation
-            depreciation = get_item(cash_flow, ['Depreciation', 'DepreciationAndAmortization'])
+            depreciation = get_item(cash_flow, ['Depreciation And Amortization', 'Depreciation', 'DepreciationAndAmortization'])
             if depreciation:
                 metrics['depreciation'] = depreciation
 
