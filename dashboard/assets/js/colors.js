@@ -38,8 +38,20 @@ export function mix(a, b, t) {
   return oklabToHex(A.map((v, i) => v + (B[i] - v) * t));
 }
 
-/** Near-black or white, whichever reads on the given fill. */
-export const inkOn = (fill) => (hexToOklab(fill)[0] > 0.68 ? '#0b0b0b' : '#ffffff');
+function luminance(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => toLinear(c / 255));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+const INK = { dark: '#0b0b0b', light: '#ffffff' };
+const INK_LUMINANCE = luminance(INK.dark);
+
+/** Near-black or white, whichever has the higher WCAG contrast on the given fill. */
+export function inkOn(fill) {
+  const y = luminance(fill);
+  return (y + 0.05) / (INK_LUMINANCE + 0.05) >= 1.05 / (y + 0.05) ? INK.dark : INK.light;
+}
 
 /**
  * Diverging color for t in [-1, 1]: unfavourable (red) through the neutral

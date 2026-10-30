@@ -53,8 +53,9 @@ export class Dataset {
     this.stocks = rows.map((row) => Object.fromEntries(columns.map((c, i) => [c, row[i]])));
     this.byTicker = new Map(this.stocks.map((s) => [s.ticker, s]));
 
+    // Weights and totals use each listing's own value, so dual-class companies count once
     const caps = new Map();
-    for (const s of this.stocks) caps.set(s.sector, (caps.get(s.sector) || 0) + (s.market_cap || 0));
+    for (const s of this.stocks) caps.set(s.sector, (caps.get(s.sector) || 0) + (this.weight(s) || 0));
     this.sectorCap = caps;
     this.totalCap = sum([...caps.values()]);
     this.sectors = [...caps.keys()].sort((a, b) => caps.get(b) - caps.get(a));
@@ -87,8 +88,22 @@ export class Dataset {
     return sector ? this.sectorStocks.get(sector) || [] : this.stocks;
   }
 
+  /** Market value a stock contributes to weights and totals. */
+  weight(stock) {
+    return stock.listing_cap ?? stock.market_cap;
+  }
+
+  /**
+   * A stock's value as used in rankings, medians and colour scales: null where
+   * it is not meaningful (a negative P/E is a loss, not a cheap stock).
+   */
+  rankable(stock, key) {
+    const v = stock[key];
+    return this.metric(key)?.positive_only && !(v > 0) ? null : v;
+  }
+
   values(key, stocks = this.stocks) {
-    return stocks.map((s) => s[key]);
+    return stocks.map((s) => this.rankable(s, key));
   }
 
   median(key, stocks = this.stocks) {
@@ -106,7 +121,7 @@ export class Dataset {
    * the most favourable end for metrics with a direction.
    */
   favourability(stock, key, peers = this.stocks) {
-    const p = percentileRank(this.values(key, peers), stock[key]);
+    const p = percentileRank(this.values(key, peers), this.rankable(stock, key));
     if (p === null) return null;
     return this.metric(key)?.better === -1 ? 100 - p : p;
   }
@@ -166,9 +181,15 @@ export class Dataset {
 
   prices() {
     if (!this.history) return Promise.resolve(null);
-    this.pricesPromise ??= fetch('data/prices.json')
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null);
+    this.pricesPromise ??= fetch('data/prices.json', { cache: 'no-cache' })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .catch(() => {
+        this.pricesPromise = null; // try again on the next stock
+        return null;
+      });
     return this.pricesPromise;
   }
 }

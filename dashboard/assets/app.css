@@ -285,10 +285,13 @@ button, input, select { font: inherit; color: inherit; }
 /* ---------------------------------------------------------------- controls */
 
 .seg {
-  display: inline-flex; padding: 2px; gap: 2px;
+  display: inline-flex; padding: 2px; gap: 2px; max-width: 100%;
+  overflow-x: auto; scrollbar-width: none; /* scrolls inside itself on narrow screens */
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
+.seg::-webkit-scrollbar { display: none; }
 .seg button {
+  flex: none;
   height: 28px; padding: 0 11px; border: 0; border-radius: 6px;
   background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 500; cursor: pointer;
   white-space: nowrap;
@@ -379,6 +382,10 @@ table.data thead tr.group th {
 }
 table.data th.sortable { cursor: pointer; user-select: none; }
 table.data th.sortable:hover { color: var(--ink); }
+.th-sort {
+  padding: 0; border: 0; background: none; color: inherit; font: inherit;
+  text-align: inherit; cursor: pointer;
+}
 table.data th[aria-sort] { color: var(--ink); }
 table.data th[aria-sort="ascending"]::after { content: " ↑"; }
 table.data th[aria-sort="descending"]::after { content: " ↓"; }
@@ -387,6 +394,7 @@ table.data tbody tr:hover td { background: var(--surface-2); }
 table.data tbody tr.active td { background: var(--accent-wash); }
 table.data .sticky-col { position: sticky; left: 0; z-index: 1; background: var(--surface); }
 table.data thead .sticky-col { z-index: 3; }
+table.data thead tr.group th.sticky-col { position: sticky; left: 0; top: auto; z-index: 3; background: var(--surface); }
 table.data .ticker { font-weight: 600; color: var(--ink); }
 table.data .company { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12px; }
 table.data td.heat { color: var(--heat-ink, var(--ink)); background: var(--heat, transparent); border-top-color: var(--surface); box-shadow: inset 0 0 0 1px var(--surface); }
@@ -418,12 +426,14 @@ table.scorecard tr.total td { border-top: 1px solid var(--border-strong); font-w
 /* ---------------------------------------------------------------- lists */
 
 .rank-list { list-style: none; margin: 0; padding: 0; }
-.rank-list li {
-  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center;
-  padding: 9px 0; border-top: 1px solid var(--border); cursor: pointer;
-}
+.rank-list li { border-top: 1px solid var(--border); }
 .rank-list li:first-child { border-top: 0; }
-.rank-list li:hover .ticker { color: var(--accent-ink); }
+.rank-list button {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  width: 100%; padding: 9px 0; border: 0; background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.rank-list button:hover .ticker { color: var(--accent-ink); }
 .rank-list .rank { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .rank-list .ticker { font-weight: 600; }
 .rank-list .name { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -472,12 +482,16 @@ table.scorecard tr.total td { border-top: 1px solid var(--border-strong); font-w
   transform: translateX(24px); opacity: 0; transition: transform 0.22s ease, opacity 0.22s ease;
 }
 .drawer.open .drawer-panel { transform: none; opacity: 1; }
-.drawer-close { position: absolute; top: 16px; right: 16px; z-index: 2; }
-.drawer-body { padding: 24px 28px 48px; }
+/* Stays in view while the panel scrolls; content passes under the whole band */
+.drawer-bar {
+  position: sticky; top: 0; z-index: 2; display: flex; justify-content: flex-end;
+  padding: 12px 12px 8px; background: var(--surface);
+}
+.drawer-body { padding: 0 28px 48px; }
 .drawer-body .section { margin-top: 28px; }
 .drawer-body .section-head h2 { font-size: 15px; }
 
-.stock-head { padding-right: 48px; }
+.stock-head { padding-right: 8px; }
 .stock-head .eyebrow { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; color: var(--muted); font-size: 12.5px; }
 .stock-head h2 { margin-top: 6px; font-size: 22px; line-height: 1.25; }
 .stock-head h2 .symbol { color: var(--muted); font-weight: 500; }
@@ -538,6 +552,15 @@ table.scorecard tr.total td { border-top: 1px solid var(--border-strong); font-w
   .span-4, .span-5, .span-7, .span-8 { grid-column: span 12; }
 }
 
+/* Tablet widths: the full top bar does not fit, so drop the badge and let search and the tabs shrink */
+@media (min-width: 861px) and (max-width: 1120px) {
+  .data-badge { display: none; }
+  .nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .topbar-tools { flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
+  .search { flex: 0 1 220px; width: auto; min-width: 140px; }
+}
+
 @media (max-width: 860px) {
   .topbar-inner { height: auto; flex-wrap: wrap; padding: 10px 16px 0; gap: 10px; }
   .topbar-tools { display: contents; }
@@ -558,7 +581,7 @@ table.scorecard tr.total td { border-top: 1px solid var(--border-strong); font-w
   .tile-value { font-size: 22px; }
   .chart.tall { height: 400px; }
   .chart.xl { height: 480px; }
-  .drawer-body { padding: 20px 18px 40px; }
+  .drawer-body { padding: 0 18px 40px; }
   .facts { grid-template-columns: minmax(0, 1fr); }
   .peer-bars { grid-template-columns: minmax(96px, 120px) minmax(0, 1fr) 64px; }
   .footer-inner { padding: 18px 16px 28px; }

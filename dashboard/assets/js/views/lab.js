@@ -20,7 +20,8 @@ const CORRELATION_METRICS = [
 
 export function render(root, ds, { params }) {
   const numeric = ds.numericMetrics();
-  const pick = (key, fallback) => (ds.has(params.get(key)) ? params.get(key) : fallback);
+  // Only numeric metrics can go on an axis; anything else in the URL falls back to the default
+  const pick = (key, fallback) => (numeric.some((m) => m.key === params.get(key)) ? params.get(key) : fallback);
   const state = {
     x: pick('x', ds.has('forward_pe') ? 'forward_pe' : numeric[0].key),
     y: pick('y', ds.has('1y_return') ? '1y_return' : numeric[1].key),
@@ -104,7 +105,10 @@ export function render(root, ds, { params }) {
   const corrEl = $('[data-chart="corr"]');
   const drawCorr = () => {
     disposeCharts(corrEl.parentElement);
-    renderCorrelation(createChart(corrEl), $('[data-corr-sub]'), ds, t, state.focus);
+    renderCorrelation(createChart(corrEl), $('[data-corr-sub]'), ds, t, state.focus, (x, y) => {
+      plot(x, y);
+      scatterEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   };
 
   drawScatter();
@@ -116,13 +120,14 @@ export function render(root, ds, { params }) {
   onSelect(root, 'x', (v) => { state.x = v; setParams({ x: v }); drawScatter(); });
   onSelect(root, 'y', (v) => { state.y = v; setParams({ y: v }); drawScatter(); });
   onSelect(root, 'dist', (v) => { state.dist = v; setParams({ dist: v }); drawBox(); });
-  $('[data-swap]').addEventListener('click', () => {
-    [state.x, state.y] = [state.y, state.x];
-    root.querySelector('[data-select="x"]').value = state.x;
-    root.querySelector('[data-select="y"]').value = state.y;
-    setParams({ x: state.x, y: state.y });
+  const plot = (x, y) => {
+    Object.assign(state, { x, y });
+    root.querySelector('[data-select="x"]').value = x;
+    root.querySelector('[data-select="y"]').value = y;
+    setParams({ x, y });
     drawScatter();
-  });
+  };
+  $('[data-swap]').addEventListener('click', () => plot(state.y, state.x));
   $('[data-trim]').addEventListener('change', (e) => {
     state.trim = e.target.checked;
     setParams({ trim: state.trim ? null : '0' });
@@ -142,13 +147,13 @@ export function render(root, ds, { params }) {
 function renderScatter(chart, statsEl, ds, t, state) {
   const mx = ds.metric(state.x);
   const my = ds.metric(state.y);
-  let stocks = ds.stocks.filter((s) => isNum(s[state.x]) && isNum(s[state.y]));
+  let stocks = ds.stocks.filter((s) => isNum(ds.rankable(s, state.x)) && isNum(ds.rankable(s, state.y)));
   const total = stocks.length;
   if (state.trim) {
     const bounds = (k) => [quantile(stocks.map((s) => s[k]), 0.01), quantile(stocks.map((s) => s[k]), 0.99)];
     const [x0, x1] = bounds(state.x);
     const [y0, y1] = bounds(state.y);
-    stocks = stocks.filter((s) => s[state.x] >= x0 && s[state.x] <= x1 && s[state.y] >= y0 && s[state.y] <= y1);
+    stocks = stocks.filter((s) => ds.rankable(s, state.x) >= x0 && ds.rankable(s, state.x) <= x1 && ds.rankable(s, state.y) >= y0 && ds.rankable(s, state.y) <= y1);
   }
   const focus = state.focus;
   const inFocus = (s) => !focus || s.sector === focus;
@@ -156,14 +161,14 @@ function renderScatter(chart, statsEl, ds, t, state) {
   const ordered = [...stocks.filter((s) => !inFocus(s)), ...stocks.filter(inFocus)];
   const subject = stocks.filter(inFocus);
 
-  const xs = subject.map((s) => s[state.x]);
-  const ys = subject.map((s) => s[state.y]);
+  const xs = subject.map((s) => ds.rankable(s, state.x));
+  const ys = subject.map((s) => ds.rankable(s, state.y));
   const fit = linearFit(xs, ys);
   const r = pearson(xs, ys);
   const rho = spearman(xs, ys);
 
-  const xMin = Math.min(...stocks.map((s) => s[state.x]));
-  const xMax = Math.max(...stocks.map((s) => s[state.x]));
+  const xMin = Math.min(...stocks.map((s) => ds.rankable(s, state.x)));
+  const xMax = Math.max(...stocks.map((s) => ds.rankable(s, state.x)));
 
   chart.setOption({
     ...base(t),
@@ -177,8 +182,8 @@ function renderScatter(chart, statsEl, ds, t, state) {
         const s = p.data.stock;
         if (!s) return '';
         return tooltipHtml(`${s.ticker} · ${s.name}`, [
-          [null, mx.label, value(mx, s[state.x], { signed: mx.signed })],
-          [null, my.label, value(my, s[state.y], { signed: my.signed })],
+          [null, mx.label, value(mx, ds.rankable(s, state.x), { signed: mx.signed })],
+          [null, my.label, value(my, ds.rankable(s, state.y), { signed: my.signed })],
           [null, 'Sector', s.sector],
         ]);
       },
@@ -187,7 +192,7 @@ function renderScatter(chart, statsEl, ds, t, state) {
       {
         type: 'scatter',
         data: ordered.map((s) => ({
-          value: [s[state.x], s[state.y]],
+          value: [ds.rankable(s, state.x), ds.rankable(s, state.y)],
           stock: s,
           itemStyle: inFocus(s) ? { color: t.accent, opacity: focus ? 0.9 : 0.6 } : { color: t.context, opacity: 0.55 },
         })),
@@ -319,14 +324,11 @@ function heatmap(chart, t, labels, matrix, { onCell = null, labelAbove = 0.5 } =
     for (let j = 0; j < n; j += 1) {
       const v = matrix[i][j];
       const fill = i === j ? t.surface3 : diverging(isNum(v) ? v : null, div);
-      data.push({
-        value: [j, i, v],
-        itemStyle: { color: fill },
-        label: { show: i !== j && isNum(v) && Math.abs(v) >= labelAbove, color: inkOn(fill) },
-      });
+      data.push({ value: [j, i, v], itemStyle: { color: fill }, label: { color: inkOn(fill) } });
     }
   }
-  chart.setOption({
+  const labelled = (p) => p.data.value[0] !== p.data.value[1] && isNum(p.data.value[2]) && Math.abs(p.data.value[2]) >= labelAbove;
+  chart.setOption({ baseOption: {
     ...base(t),
     grid: { left: 8, right: 8, top: 8, bottom: 8, containLabel: true },
     xAxis: categoryAxis(t, labels, { axisLine: { show: false }, axisLabel: { color: t.ink2, fontSize: 11, rotate: 45, interval: 0 }, splitArea: { show: false } }),
@@ -341,21 +343,23 @@ function heatmap(chart, t, labels, matrix, { onCell = null, labelAbove = 0.5 } =
       type: 'heatmap',
       data,
       itemStyle: { borderColor: t.surface, borderWidth: 2, borderRadius: 3 },
-      label: { fontSize: 10, formatter: (p) => number(p.data.value[2], 2).replace(/^(−)?0\./, '$1.') },
+      label: { show: true, fontSize: 10, formatter: (p) => (labelled(p) ? number(p.data.value[2], 2).replace(/^(−)?0\./, '$1.') : '') },
       emphasis: { itemStyle: { borderColor: t.ink, borderWidth: 1 } },
     }],
-  });
+  },
+  // Narrow charts: cells are too small for numbers; the tooltip has them
+  media: [{ query: { maxWidth: 520 }, option: { series: [{ label: { show: false } }] } }] });
   if (onCell) chart.on('click', (p) => onCell(p.data.value[1], p.data.value[0]));
 }
 
-function renderCorrelation(chart, subEl, ds, t, focus) {
+function renderCorrelation(chart, subEl, ds, t, focus, onPick) {
   const metrics = CORRELATION_METRICS.map((k) => ds.metric(k)).filter(Boolean);
   const stocks = ds.peers(focus || null);
   const matrix = metrics.map((a) => metrics.map((b) => (a === b ? 1 : spearman(ds.values(a.key, stocks), ds.values(b.key, stocks)))));
   subEl.textContent = `Spearman ρ · ${focus || 'all stocks'} (${stocks.length}) · select a cell to plot it`;
   heatmap(chart, t, metrics.map((m) => m.label), matrix, {
     onCell: (i, j) => {
-      if (i !== j) location.hash = `#/lab?x=${metrics[j].key}&y=${metrics[i].key}${focus ? `&focus=${slugify(focus)}` : ''}`;
+      if (i !== j) onPick(metrics[j].key, metrics[i].key);
     },
   });
 }
@@ -376,7 +380,7 @@ function forestPlot(chart, ds, t, ols) {
   chart.setOption({
     ...base(t),
     grid: { left: 8, right: 24, top: 8, bottom: 28, containLabel: true },
-    xAxis: valueAxis(t, { metric: { fmt: 'pct' }, name: 'Effect of +1 standard deviation on 1-year excess return', nameLocation: 'middle', nameGap: 28 }),
+    xAxis: valueAxis(t, { metric: { fmt: 'pct' }, name: 'Effect of +1 SD on 1-year excess return', nameLocation: 'middle', nameGap: 28 }),
     yAxis: categoryAxis(t, rows.map((c) => labelOf(c.term)), { axisLine: { show: false } }),
     tooltip: tooltip(t, {
       trigger: 'item',

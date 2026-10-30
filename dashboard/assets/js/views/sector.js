@@ -29,6 +29,7 @@ export function render(root, ds, { segments, params }) {
   let period = periods.some((p) => p.key === params.get('period')) ? params.get('period') : '1Y';
   let weighting = params.get('w') === 'equal' ? 'equal' : 'cap';
   let columns = COLUMN_SETS.some(([k]) => k === params.get('cols')) ? params.get('cols') : 'overview';
+  const [sortKey, sortDir] = (params.get('sort') || 'market_cap:desc').split(':');
 
   const r1y = ds.sectorReturn(sector, '1Y');
   const share = ds.sectorCap.get(sector) / ds.totalCap;
@@ -55,10 +56,8 @@ export function render(root, ds, { segments, params }) {
         <div class="card ${ds.history ? 'span-8' : 'span-12'}">
           ${ds.history ? `
           <div class="card-head"><h3>Sector index vs S&amp;P 500</h3>
-            <span class="aside">${legend([
-              { color: 'var(--accent)', label: sector, kind: 'line' },
-              { color: 'var(--context)', label: 'S&P 500 (SPY)', kind: 'line' },
-            ])}</span></div>
+            <span class="aside">${legend([{ color: 'var(--accent)', label: sector, kind: 'line' }]
+              .concat(ds.benchmarkSeries() ? [{ color: 'var(--context)', label: 'S&P 500 (SPY)', kind: 'line' }] : []))}</span></div>
           <div class="toolbar">
             ${seg('period', periods.map((p) => [p.key, p.key]), period, 'Period')}
             ${seg('w', [['cap', 'Cap-weighted'], ['equal', 'Equal-weighted']], weighting, 'Weighting')}
@@ -70,11 +69,11 @@ export function render(root, ds, { segments, params }) {
         <div class="card ${ds.history ? 'span-4' : 'span-12'}">
           <div class="card-head"><h3>Cheapest vs sector peers</h3><span class="sub">Lowest valuation score</span></div>
           <ol class="rank-list">${picks.map((s, i) => `
-            <li data-ticker="${esc(s.ticker)}" tabindex="0">
+            <li><button type="button" data-ticker="${esc(s.ticker)}">
               <span class="rank">${i + 1}</span>
               <span><span class="ticker">${esc(s.ticker)}</span><span class="name">${esc(s.name)}</span></span>
               <span class="value">${esc(value(ds.metric('forward_pe'), s.forward_pe))}<small>fwd P/E · score ${esc(value(ds.metric('valuation_score'), s.valuation_score))}</small></span>
-            </li>`).join('')}</ol>
+            </button></li>`).join('')}</ol>
         </div>
       </div>
     </section>
@@ -108,16 +107,16 @@ export function render(root, ds, { segments, params }) {
     onSeg(root, 'w', (v) => { weighting = v; setParams({ w: v === 'cap' ? null : v }); drawIndex(); });
   }
 
-  for (const li of root.querySelectorAll('.rank-list li')) {
-    li.addEventListener('click', () => openStock(li.dataset.ticker));
-    li.addEventListener('keydown', (e) => e.key === 'Enter' && openStock(li.dataset.ticker));
+  for (const button of root.querySelectorAll('.rank-list button')) {
+    button.addEventListener('click', () => openStock(button.dataset.ticker));
   }
 
   renderProfile(root.querySelector('[data-chart="profile"]'), ds, t, stocks);
 
   const table = new StockTable(root.querySelector('[data-table]'), ds, {
     columns: columnSet(ds, columns),
-    sort: { key: 'market_cap', dir: 'desc' },
+    sort: { key: sortKey, dir: sortDir === 'asc' ? 'asc' : 'desc' },
+    onSort: (s) => setParams({ sort: s.key === 'market_cap' && s.dir === 'desc' ? null : `${s.key}:${s.dir}` }),
     onRowClick: openStock,
   });
   table.render(stocks);
@@ -148,6 +147,7 @@ function renderIndex(chart, ds, t, sector, period, weighting) {
   const start = ds.periodStart(period);
   const dates = ds.history.dates.slice(start);
   const rebase = (series) => {
+    if (!series) return null;
     const s = series.slice(start);
     const first = s.find(isNum);
     return s.map((v) => (isNum(v) && first ? v / first - 1 : null));
@@ -155,12 +155,18 @@ function renderIndex(chart, ds, t, sector, period, weighting) {
   const sectorPath = rebase(ds.sectorSeries(sector, weighting));
   const spyPath = rebase(ds.benchmarkSeries());
   const endLabel = (name) => ({
-    show: true,
-    formatter: (p) => (p.dataIndex === dates.length - 1 ? `${name} ${pct(p.value, { signed: true })}` : ''),
-    position: 'right', color: t.ink2, fontSize: 11,
+    show: true, color: t.ink2, fontSize: 11, distance: 6,
+    formatter: (p) => `${name} ${pct(p.value, { signed: true })}`,
   });
+  const series = [
+    ...(spyPath ? [{ name: 'S&P 500', type: 'line', data: spyPath, symbol: 'none', color: t.context, lineStyle: { width: 1.5 },
+      endLabel: endLabel('S&P 500'), labelLayout: { moveOverlap: 'shiftY' } }] : []),
+    ...(sectorPath ? [{ name: sector, type: 'line', data: sectorPath, symbol: 'none', color: t.accent, lineStyle: { width: 2 },
+      endLabel: endLabel('Sector'), labelLayout: { moveOverlap: 'shiftY' },
+      areaStyle: { color: t.accent, opacity: 0.08 } }] : []),
+  ];
 
-  chart.setOption({
+  chart.setOption({ baseOption: {
     ...base(t),
     grid: { left: 8, right: 118, top: 12, bottom: 8, containLabel: true },
     xAxis: {
@@ -177,14 +183,13 @@ function renderIndex(chart, ds, t, sector, period, weighting) {
       axisPointer: { type: 'line', lineStyle: { color: t.axis } },
       formatter: (ps) => tooltipHtml(date(ps[0].axisValue), ps.map((p) => [p.color, p.seriesName, pct(p.value, { signed: true })])),
     }),
-    series: [
-      { name: 'S&P 500', type: 'line', data: spyPath, symbol: 'none', color: t.context, lineStyle: { width: 1.5 },
-        label: endLabel('S&P 500'), labelLayout: { moveOverlap: 'shiftY' } },
-      { name: sector, type: 'line', data: sectorPath, symbol: 'none', color: t.accent, lineStyle: { width: 2 },
-        label: endLabel('Sector'), labelLayout: { moveOverlap: 'shiftY' },
-        areaStyle: { color: t.accent, opacity: 0.08 } },
-    ],
-  });
+    series,
+  },
+  // Narrow charts give the end labels' room back to the plot; the legend names the lines
+  media: [{
+    query: { maxWidth: 520 },
+    option: { grid: { right: 12 }, series: series.map(() => ({ endLabel: { show: false } })) },
+  }] });
 }
 
 /** Deterministic jitter in [-0.5, 0.5) from a ticker, so dots never jump between renders. */

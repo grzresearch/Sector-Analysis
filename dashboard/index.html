@@ -49,12 +49,13 @@
         <div class="search" role="search">
           <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
           <input id="search" type="search" placeholder="Search ticker or company" autocomplete="off" spellcheck="false"
-                 role="combobox" aria-expanded="false" aria-controls="search-results" aria-label="Search stocks">
+                 role="combobox" aria-expanded="false" aria-controls="search-results" aria-autocomplete="list" aria-label="Search stocks">
           <kbd>/</kbd>
-          <ul id="search-results" class="search-results" role="listbox" hidden></ul>
+          <ul id="search-results" class="search-results" role="listbox" aria-label="Matching stocks" hidden></ul>
+          <span id="search-status" class="sr-only" role="status"></span>
         </div>
         <span id="data-badge" class="data-badge" hidden></span>
-        <button id="theme-toggle" class="icon-button" type="button" aria-label="Toggle dark mode">
+        <button id="theme-toggle" class="icon-button" type="button" aria-label="Dark mode">
           <svg class="icon-sun" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
           <svg class="icon-moon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16.5 12.2A7 7 0 0 1 7.8 3.5a7 7 0 1 0 8.7 8.7Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
         </button>
@@ -69,15 +70,17 @@
     </div>
   </main>
 
-  <aside id="drawer" class="drawer" aria-hidden="true" aria-label="Stock details">
+  <div id="drawer" class="drawer" aria-hidden="true">
     <div class="drawer-backdrop" data-close></div>
-    <div class="drawer-panel" role="dialog" aria-modal="true" tabindex="-1">
-      <button class="icon-button drawer-close" type="button" aria-label="Close" data-close>
-        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      </button>
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title" tabindex="-1">
+      <div class="drawer-bar">
+        <button class="icon-button" type="button" aria-label="Close" data-close>
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
       <div class="drawer-body"></div>
     </div>
-  </aside>
+  </div>
 
   <footer class="footer">
     <div class="footer-inner">

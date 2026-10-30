@@ -155,12 +155,13 @@ export class StockTable {
       : { key, dir: firstDir };
     this.onSort?.(this.sort);
     this.render(this.rows);
+    this.el.querySelector(`th[data-key="${CSS.escape(key)}"] button`)?.focus();
   }
 
   sortValue(stock, key) {
     const m = this.ds.metric(key);
     if (m?.fmt === 'label') return labelRank(key, stock[key]) ?? stock[key];
-    return stock[key];
+    return m ? this.ds.rankable(stock, key) : stock[key];
   }
 
   render(rows) {
@@ -173,14 +174,16 @@ export class StockTable {
           return sort.dir === 'asc' || missing ? c : -c;
         })
       : rows;
+    this.sorted = sorted;
 
     const ariaSort = (key) => (sort?.key === key ? ` aria-sort="${sort.dir === 'asc' ? 'ascending' : 'descending'}"` : '');
-    const head = [`<th class="sortable sticky-col" data-key="ticker"${ariaSort('ticker')}>Stock</th>`]
-      .concat(this.showSector ? [`<th class="sortable left" data-key="sector"${ariaSort('sector')}>Sector</th>`] : [])
+    const button = (label) => `<button type="button" class="th-sort">${esc(label)}</button>`;
+    const head = [`<th class="sortable sticky-col" data-key="ticker"${ariaSort('ticker')}>${button('Stock')}</th>`]
+      .concat(this.showSector ? [`<th class="sortable left" data-key="sector"${ariaSort('sector')}>${button('Sector')}</th>`] : [])
       .concat(columns.map((key) => {
         const m = ds.metric(key);
         const left = m?.fmt === 'label' ? ' left' : '';
-        return `<th class="sortable${left}" data-key="${esc(key)}" title="${esc(m?.description || '')}"${ariaSort(key)}>${esc(m?.label || key)}</th>`;
+        return `<th class="sortable${left}" data-key="${esc(key)}" title="${esc(m?.description || '')}"${ariaSort(key)}>${button(m?.label || key)}</th>`;
       }))
       .join('');
 

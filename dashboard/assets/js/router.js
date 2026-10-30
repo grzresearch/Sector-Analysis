@@ -49,19 +49,30 @@ export function setParams(updates) {
     if (v === null || v === undefined || v === '') params.delete(k);
     else params.set(k, v);
   }
-  history.replaceState(null, '', hashOf(path, params));
+  history.replaceState(history.state, '', hashOf(path, params));
   state.key = viewKey(path, params);
 }
 
+/**
+ * Open the stock panel as one history entry: switching stocks inside the panel
+ * replaces it, and closing goes back, so Back never lands on a closed panel.
+ */
 export function openStock(ticker) {
   const { path, params } = parseHash();
   params.set('stock', ticker);
-  location.hash = hashOf(path, params);
+  if (history.state?.panel) history.replaceState({ panel: true }, '', hashOf(path, params));
+  else history.pushState({ panel: true }, '', hashOf(path, params));
+  state.run();
 }
 
 export function closeStock() {
   const { path, params } = parseHash();
   if (!params.has('stock')) return;
+  if (history.state?.panel) {
+    history.back(); // the hashchange that follows closes the panel
+    return;
+  }
+  // Opened from a shared link: there is no entry to go back to
   params.delete('stock');
   history.replaceState(null, '', hashOf(path, params));
   state.run();

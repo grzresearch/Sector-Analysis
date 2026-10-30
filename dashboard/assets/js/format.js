@@ -17,9 +17,10 @@ const withSign = (v, s) => (v > 0 && Number(s.replace(/[^0-9.]/g, '')) !== 0 ? `
 
 export function cap(v) {
   if (!isNum(v)) return DASH;
+  // Pick the unit from the rounded value, so $999.96B reads $1.00T, not $1,000B
   const a = Math.abs(v);
-  if (a >= 1e12) return `$${fixed(v / 1e12, 2)}T`;
-  if (a >= 1e9) return `$${fixed(v / 1e9, a >= 1e11 ? 0 : 1)}B`;
+  if (a >= 999.5e9) return `$${fixed(v / 1e12, 2)}T`;
+  if (a >= 999.5e6) return `$${fixed(v / 1e9, a >= 99.95e9 ? 0 : 1)}B`;
   if (a >= 1e6) return `$${fixed(v / 1e6, 0)}M`;
   return `$${fixed(v, 0)}`;
 }
@@ -76,7 +77,8 @@ export function tick(metric, v) {
     case 'multiple':
       return `${fixed(v, Math.abs(v) < 10 && !Number.isInteger(v) ? 1 : 0)}×`;
     case 'cap':
-      return cap(v).replace('.00', '');
+      // Drop trailing decimal zeros only: $1.50T -> $1.5T, $2.00T -> $2T, $500B stays
+      return cap(v).replace(/(\.\d*?)0+(?=[TBM])/, '$1').replace(/\.(?=[TBM])/, '');
     case 'price':
       return `$${fixed(v, 0)}`;
     default:

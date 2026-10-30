@@ -23,6 +23,8 @@ const TAGS = [
 const drawer = document.getElementById('drawer');
 const panel = drawer.querySelector('.drawer-panel');
 const body = drawer.querySelector('.drawer-body');
+// Everything behind the panel; inert while it is open, so focus and clicks stay in the panel
+const page = ['.skip-link', '.topbar', '#view', '.footer'].map((sel) => document.querySelector(sel));
 let current = null;
 let returnFocus = null;
 
@@ -39,14 +41,18 @@ function close() {
   drawer.classList.remove('open');
   drawer.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
+  for (const el of page) el.inert = false;
   disposeCharts(drawer);
-  returnFocus?.focus?.({ preventScroll: true });
+  // Back to where the reader was; a panel opened from a link returns to the page itself
+  const target = returnFocus?.isConnected && returnFocus !== document.body ? returnFocus : document.getElementById('view');
+  target.focus({ preventScroll: true });
 }
 
-export function renderStock(ds, ticker) {
+/** Show a stock in the panel (null closes it). `force` redraws the same stock, e.g. after a theme change. */
+export function renderStock(ds, ticker, { force = false } = {}) {
   const stock = ticker ? ds.byTicker.get(ticker) : null;
   if (!stock) return close();
-  if (current === ticker && drawer.classList.contains('open')) return;
+  if (current === ticker && !force) return;
 
   if (!current) returnFocus = document.activeElement;
   current = ticker;
@@ -55,10 +61,18 @@ export function renderStock(ds, ticker) {
   drawer.classList.add('open');
   drawer.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
-  panel.scrollTop = 0;
-  panel.focus({ preventScroll: true });
+  for (const el of page) el.inert = true;
+  if (!force) {
+    panel.scrollTop = 0;
+    panel.focus({ preventScroll: true });
+  }
 
   if (ds.history) renderPrice(ds, stock);
+}
+
+/** Redraw the open panel, if any. */
+export function redrawStock(ds) {
+  if (current) renderStock(ds, current, { force: true });
 }
 
 function content(ds, s) {
@@ -71,7 +85,7 @@ function content(ds, s) {
         ${s.industry ? `<span>${esc(s.industry)}</span>` : ''}
         ${index ? `<span>${esc(index)}</span>` : ''}
       </div>
-      <h2>${esc(s.name)} <span class="symbol">${esc(s.ticker)}</span></h2>
+      <h2 id="drawer-title">${esc(s.name)} <span class="symbol">${esc(s.ticker)}</span></h2>
       <div class="stock-price">
         <span class="price">${esc(value(ds.metric('current_price'), s.current_price))}</span>
         ${isNum(r1y) ? `<span class="${tone(r1y)}">${esc(pct(r1y, { signed: true }))} over 1 year</span>` : ''}
@@ -82,7 +96,8 @@ function content(ds, s) {
 
     ${ds.history ? `<section class="section">
       <div class="section-head"><h2>Price vs sector</h2><p>Weekly closes over two years, rebased to the first week.</p></div>
-      ${legend([{ color: 'var(--accent)', label: s.ticker, kind: 'line' }, { color: 'var(--context)', label: `${s.sector} index`, kind: 'line' }])}
+      ${legend([{ color: 'var(--accent)', label: s.ticker, kind: 'line' }]
+        .concat(ds.sectorSeries(s.sector) ? [{ color: 'var(--context)', label: `${s.sector} index`, kind: 'line' }] : []))}
       <div class="chart" data-chart="price" style="height:240px;margin-top:6px"></div>
     </section>` : ''}
 
@@ -175,7 +190,7 @@ async function renderPrice(ds, stock) {
   const daily = ds.history.dates;
   const sectorDaily = ds.sectorSeries(stock.sector, 'cap');
   let j = 0;
-  const sectorWeekly = prices.dates.map((d) => {
+  const sectorWeekly = sectorDaily && prices.dates.map((d) => {
     while (j + 1 < daily.length && daily[j + 1] <= d) j += 1;
     return daily[j] <= d ? sectorDaily[j] : null;
   });
@@ -186,7 +201,7 @@ async function renderPrice(ds, stock) {
     return xs.map((v, i) => (i >= first && isNum(v) && isNum(b) ? v / b - 1 : null));
   };
   const stockPath = rebase(closes);
-  const sectorPath = rebase(sectorWeekly);
+  const sectorPath = sectorWeekly && rebase(sectorWeekly);
   const t = tokens();
   const m = ds.metric('current_price');
 
@@ -211,7 +226,7 @@ async function renderPrice(ds, stock) {
       },
     }),
     series: [
-      { name: `${stock.sector} index`, type: 'line', data: sectorPath, symbol: 'none', color: t.context, lineStyle: { width: 1.5 } },
+      ...(sectorPath ? [{ name: `${stock.sector} index`, type: 'line', data: sectorPath, symbol: 'none', color: t.context, lineStyle: { width: 1.5 } }] : []),
       { name: stock.ticker, type: 'line', data: stockPath, symbol: 'none', color: t.accent, lineStyle: { width: 2 }, areaStyle: { color: t.accent, opacity: 0.08 } },
     ],
   });

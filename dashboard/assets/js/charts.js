@@ -76,6 +76,7 @@ export function tooltip(t, extra = {}) {
 
 export function base(t) {
   return {
+    animation: !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     animationDuration: 350,
     animationDurationUpdate: 250,
     textStyle: { fontFamily: t.font, color: t.ink2, fontSize: 12 },

@@ -25,7 +25,7 @@ const SIGNAL_FILTERS = [
 const SIGNAL_GROUPS = { buy: SIGNAL_ORDER.slice(0, 2), neutral: SIGNAL_ORDER.slice(2, 3), sell: SIGNAL_ORDER.slice(3) };
 
 // Conditions are entered in display units: percent for fractions, $B for market cap
-const INPUT_SCALE = { pct: 100, cap: 1e-9 };
+const FROM_INPUT = { pct: (x) => x / 100, cap: (x) => x * 1e9 };
 const INPUT_UNIT = { pct: 'in %', pctpt: 'in %', multiple: 'multiple', cap: 'in $ billion' };
 
 const parseConditions = (raw) =>
@@ -107,7 +107,11 @@ export function render(root, ds, { params }) {
       && (!state.sector || s.sector === state.sector)
       && (!state.val || VALUATION_GROUPS[state.val]?.includes(s.valuation_category))
       && (!state.sig || SIGNAL_GROUPS[state.sig]?.includes(s.technical_signal))
-      && state.conditions.every((c) => isNum(s[c.key]) && (c.op === 'ge' ? s[c.key] >= c.value : s[c.key] <= c.value)));
+      && state.conditions.every((c) => {
+        // A negative P/E is a loss, so it never passes a valuation threshold
+        const v = ds.rankable(s, c.key);
+        return isNum(v) && (c.op === 'ge' ? v >= c.value : v <= c.value);
+      }));
   };
 
   const update = () => {
@@ -151,7 +155,7 @@ export function render(root, ds, { params }) {
     const m = ds.metric(metricInput.value);
     const entered = Number($('[data-value]').value);
     if (!m || !Number.isFinite(entered)) return;
-    state.conditions.push({ key: m.key, op: $('[data-op]').value, value: entered / (INPUT_SCALE[m.fmt] || 1) });
+    state.conditions.push({ key: m.key, op: $('[data-op]').value, value: (FROM_INPUT[m.fmt] || Number)(entered) });
     $('[data-value]').value = '';
     update();
   });
@@ -162,19 +166,30 @@ export function render(root, ds, { params }) {
     update();
   });
 
-  $('[data-export]').addEventListener('click', () => downloadCsv(ds, filtered()));
+  // Export what the table shows, in its order
+  $('[data-export]').addEventListener('click', () => downloadCsv(ds, table.sorted));
   update();
+}
+
+// CSV columns carry their unit in the header; fractions are written as percent
+const CSV_UNITS = { pct: ' (%)', pctpt: ' (%)', cap: ' ($)', price: ' ($)', multiple: ' (x)' };
+
+function csvValue(metric, v) {
+  if (metric?.fmt === 'pct' && isNum(v)) return Number((v * 100).toPrecision(6));
+  return v;
 }
 
 function downloadCsv(ds, rows) {
   const columns = ['ticker', 'name', 'sector', 'industry', ...ds.metrics.map((m) => m.key)];
-  const header = ['Ticker', 'Name', 'Sector', 'Industry', ...ds.metrics.map((m) => m.label)];
+  const header = ['Ticker', 'Name', 'Sector', 'Industry', ...ds.metrics.map((m) => m.label + (CSV_UNITS[m.fmt] || ''))];
   const quote = (v) => {
     if (v === null || v === undefined) return '';
     const s = String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const csv = [header, ...rows.map((s) => columns.map((c) => s[c]))].map((r) => r.map(quote).join(',')).join('\n');
+  const csv = [header, ...rows.map((s) => columns.map((c) => csvValue(ds.metric(c), s[c])))]
+    .map((r) => r.map(quote).join(','))
+    .join('\n');
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const a = Object.assign(document.createElement('a'), { href: url, download: `screen-${ds.meta.as_of}.csv` });
   document.body.append(a);

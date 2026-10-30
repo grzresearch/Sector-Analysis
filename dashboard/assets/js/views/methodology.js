@@ -31,12 +31,16 @@ export function render(root, ds) {
           The universe is the ${esc(meta.universe.name)}: ${meta.universe.analyzed} of ${meta.universe.size} constituents had enough data
           to be analysed. Prices are as of ${esc(date(meta.as_of))}; this build was generated ${esc(new Date(meta.generated_at).toUTCString())}.
           A scheduled GitHub Actions workflow reruns the analysis on weekdays after the US close and republishes this site.</p>
-        <p>Sector assignments follow the 11 GICS sectors. All sector statistics on this site are medians of the constituents
-          unless stated otherwise, which keeps a single extreme stock from moving a sector.</p>
+        <p>Sector assignments follow the 11 GICS sectors as listed with the index constituents; Yahoo Finance’s own
+          classification only fills gaps. All sector statistics on this site are medians of the constituents unless stated
+          otherwise, which keeps a single extreme stock from moving a sector. Valuation multiples count only where they are
+          positive: a negative P/E means a loss, not a cheap stock, so it is shown but left out of medians, rankings and colours.</p>
 
         <h3>Sector indices</h3>
-        <p>The cap-weighted index of a sector holds every constituent at today’s share count (market cap divided by price),
+        <p>The cap-weighted index of a sector holds every constituent at today’s share count (market value divided by price),
           so each day’s return is weighted by the previous day’s market value, as in a sector ETF without rebalancing.
+          A company with several listed share classes, such as Alphabet (GOOGL and GOOG), counts once: its market value is
+          split across its listings, here and in every weight and total on this site.
           The equal-weighted index averages the constituents’ daily returns and shows how the typical stock fared.
           Both use dividend-adjusted closes. The benchmark is the SPDR S&amp;P 500 ETF (SPY).</p>
 
@@ -61,8 +65,9 @@ export function render(root, ds) {
         <h3>Quality and solvency</h3>
         <p>The quality score starts at 50 and adds or subtracts points for return on equity, net margin, current ratio,
           leverage, revenue growth and the PEG ratio, bounded to 0–100. The Altman Z-score combines working capital,
-          retained earnings, EBIT, market value of equity and revenue, each scaled by total assets or liabilities;
-          it is designed for industrial companies and is not meaningful for banks and insurers.</p>
+          retained earnings, EBIT, market value of equity and revenue, each scaled by total assets or liabilities.
+          It was built for industrial companies, so it is not computed for financials, real estate and utilities, nor for
+          companies whose statements are in another currency than their share price.</p>
 
         <h3>Factor models</h3>
         <p>An ordinary least-squares regression relates 1-year excess returns to eight characteristics

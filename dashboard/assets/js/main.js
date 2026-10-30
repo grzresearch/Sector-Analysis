@@ -4,7 +4,7 @@ import { loadDataset } from './store.js';
 import { disposeCharts } from './charts.js';
 import { date, esc } from './format.js';
 import { start, refresh, openStock } from './router.js';
-import { renderStock } from './drawer.js';
+import { renderStock, redrawStock } from './drawer.js';
 import * as overview from './views/overview.js';
 import * as sectors from './views/sector.js';
 import * as screener from './views/screener.js';
@@ -43,12 +43,16 @@ function renderView(ds, path, params) {
 function initSearch(ds) {
   const input = document.getElementById('search');
   const list = document.getElementById('search-results');
+  const status = document.getElementById('search-status');
   let matches = [];
   let active = 0;
 
   const close = () => {
+    matches = [];
+    active = 0;
     list.hidden = true;
     input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
   };
 
   const choose = (ticker) => {
@@ -64,8 +68,10 @@ function initSearch(ds) {
           .map((s, i) => `<li role="option" id="opt-${i}" data-ticker="${esc(s.ticker)}" aria-selected="${i === active}">
             <span class="ticker">${esc(s.ticker)}</span><span class="name">${esc(s.name)}</span><span class="sector">${esc(s.sector)}</span></li>`)
           .join('')
-      : '<li class="empty">No matching stock</li>';
-    input.setAttribute('aria-activedescendant', matches.length ? `opt-${active}` : '');
+      : '<li class="empty" role="option" aria-disabled="true">No matching stock</li>';
+    if (matches.length) input.setAttribute('aria-activedescendant', `opt-${active}`);
+    else input.removeAttribute('aria-activedescendant');
+    status.textContent = matches.length ? `${matches.length} matching stocks` : 'No matching stock';
   };
 
   input.addEventListener('input', () => {
@@ -95,10 +101,10 @@ function initSearch(ds) {
   input.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
-      if (!matches.length) return;
+      if (list.hidden || !matches.length) return;
       active = (active + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length;
       paint();
-    } else if (e.key === 'Enter' && matches[active]) {
+    } else if (e.key === 'Enter' && !list.hidden && matches[active]) {
       choose(matches[active].ticker);
     } else if (e.key === 'Escape') {
       input.value = '';
@@ -127,16 +133,34 @@ function initSearch(ds) {
 
 // ------------------------------------------------------------ chrome
 
-function initTheme() {
-  document.getElementById('theme-toggle').addEventListener('click', () => {
+function initTheme(getDataset) {
+  const toggle = document.getElementById('theme-toggle');
+  const sync = () => toggle.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'dark'));
+  sync();
+  toggle.addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
+    sync();
     try {
       localStorage.setItem('theme', next);
     } catch {
       /* storage unavailable: the choice lasts for this page view */
     }
+    const ds = getDataset();
+    if (!ds) return;
+    // Charts read the theme's colours when drawn: draw the view again, where the reader was
+    const y = window.scrollY;
     refresh();
+    window.scrollTo({ top: y });
+    redrawStock(ds);
+  });
+}
+
+function initSkipLink() {
+  // The hash belongs to the router, so move focus without touching it
+  document.querySelector('.skip-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    main.focus();
   });
 }
 
@@ -162,8 +186,9 @@ function showError(error) {
 }
 
 async function boot() {
-  initTheme();
   let ds;
+  initTheme(() => ds);
+  initSkipLink();
   try {
     ds = await loadDataset();
   } catch (error) {

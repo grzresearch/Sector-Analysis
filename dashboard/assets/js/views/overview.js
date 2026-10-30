@@ -54,10 +54,8 @@ export function render(root, ds, { params }) {
         ${ds.history ? `
         <div class="card span-7">
           <div class="card-head"><h3>Path over the period</h3>
-            <span class="aside">${legend([
-              { color: 'var(--accent)', label: 'Sector', kind: 'line' },
-              { color: 'var(--context)', label: 'S&P 500 (SPY)', kind: 'line' },
-            ])}</span></div>
+            <span class="aside">${legend([{ color: 'var(--accent)', label: 'Sector', kind: 'line' }]
+              .concat(ds.benchmarkSeries() ? [{ color: 'var(--context)', label: 'S&P 500 (SPY)', kind: 'line' }] : []))}</span></div>
           <div class="multiples" data-multiples></div>
         </div>` : ''}
       </div>
@@ -123,7 +121,7 @@ export function render(root, ds, { params }) {
     drawPerformance();
   });
 
-  renderScorecard(root.querySelector('[data-scorecard]'), ds, t);
+  renderScorecard(root.querySelector('[data-scorecard]'), ds, t, params.get('sort'));
 
   const mapChart = createChart(root.querySelector('[data-chart="map"]'));
   renderMap(mapChart, root, ds, t, mapMetric);
@@ -223,9 +221,9 @@ function renderRanking(root, ds, t, period, weighting) {
           color: r.value >= 0 ? t.pos : t.neg,
           borderRadius: r.value >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4],
         },
-        label: { position: r.value >= 0 ? 'right' : 'left' },
       })),
-      label: { show: true, color: t.ink2, fontSize: 11.5, formatter: (p) => label(p.value) },
+      // Right of each bar's end; for a negative bar that is just right of zero, clear of the names
+      label: { show: true, position: 'right', color: t.ink2, fontSize: 11.5, formatter: (p) => label(p.value) },
       emphasis: { itemStyle: { opacity: 0.85 } },
       markLine: isNum(spy) ? {
         silent: true,
@@ -243,16 +241,19 @@ function renderMultiples(el, ds, t, period, weighting) {
   const start = ds.periodStart(period);
   const dates = ds.history.dates.slice(start);
   const rebase = (series) => {
+    if (!series) return null;
     const s = series.slice(start);
     const first = s.find(isNum);
     return s.map((v) => (isNum(v) && first ? v / first - 1 : null));
   };
   const spy = rebase(ds.benchmarkSeries());
   const ranked = rankedReturns(ds, period, weighting);
-  const lines = ranked.map((r) => ({ ...r, path: rebase(ds.sectorSeries(r.sector, weighting)) }));
+  const lines = ranked
+    .map((r) => ({ ...r, path: rebase(ds.sectorSeries(r.sector, weighting)) }))
+    .filter((l) => l.path);
 
   // One shared scale so the panels compare honestly
-  const all = lines.flatMap((l) => l.path).concat(spy).filter(isNum);
+  const all = lines.flatMap((l) => l.path).concat(spy || []).filter(isNum);
   const lo = Math.min(0, ...all);
   const hi = Math.max(0, ...all);
   const pad = (hi - lo) * 0.06;
@@ -278,10 +279,10 @@ function renderMultiples(el, ds, t, period, weighting) {
         formatter: (ps) => tooltipHtml(date(ps[0].axisValue), ps.map((p) => [p.color, p.seriesName, pct(p.value, { signed: true })])),
       }),
       series: [
-        {
+        ...(spy ? [{
           name: 'S&P 500', type: 'line', data: spy, symbol: 'none', color: t.context,
           lineStyle: { width: 1.5 }, z: 1,
-        },
+        }] : []),
         {
           name: l.sector, type: 'line', data: l.path, symbol: 'none', color: t.accent,
           lineStyle: { width: 2, cap: 'round', join: 'round' }, z: 2,
@@ -349,7 +350,7 @@ function sectorStat(ds, sector, col) {
   }
 }
 
-function renderScorecard(el, ds, t) {
+function renderScorecard(el, ds, t, initialSort) {
   const columns = scorecardColumns(ds);
   const rows = ds.sectors.map((sector) => ({ sector, values: columns.map((c) => sectorStat(ds, sector, c)) }));
   const total = { sector: null, values: columns.map((c) => sectorStat(ds, null, c)) };
@@ -362,10 +363,15 @@ function renderScorecard(el, ds, t) {
     return { m: mean(xs), s: std(xs) };
   });
 
-  let sort = { j: columns.findIndex((c) => c.key === 'weight'), dir: 'desc' };
+  const [sortKey, sortDir] = (initialSort || 'weight:desc').split(':');
+  const j0 = sortKey === 'sector' ? -1 : columns.findIndex((c) => c.key === sortKey);
+  let sort = j0 >= -1 && (j0 >= 0 || sortKey === 'sector')
+    ? { j: j0, dir: sortDir === 'asc' ? 'asc' : 'desc' }
+    : { j: columns.findIndex((c) => c.key === 'weight'), dir: 'desc' };
 
   const draw = () => {
     const sorted = [...rows].sort((a, b) => {
+      if (sort.j < 0) return a.sector.localeCompare(b.sector) * (sort.dir === 'asc' ? 1 : -1);
       const va = a.values[sort.j];
       const vb = b.values[sort.j];
       if (!isNum(va) || !isNum(vb)) return isNum(va) ? -1 : isNum(vb) ? 1 : 0;
@@ -387,18 +393,19 @@ function renderScorecard(el, ds, t) {
       return `<td class="heat" style="--heat:${fill};--heat-ink:${inkOn(fill)}">${text}</td>`;
     };
 
+    const ariaSort = (j) => (sort.j === j ? ` aria-sort="${sort.dir === 'asc' ? 'ascending' : 'descending'}"` : '');
     const head = columns
-      .map((c, j) => `<th class="sortable" data-j="${j}" title="${esc(c.description)}"${sort.j === j
-        ? ` aria-sort="${sort.dir === 'asc' ? 'ascending' : 'descending'}"` : ''}>${esc(c.label)}</th>`)
+      .map((c, j) => `<th class="sortable" data-j="${j}" title="${esc(c.description)}"${ariaSort(j)}>
+        <button type="button" class="th-sort">${esc(c.label)}</button></th>`)
       .join('');
 
     el.innerHTML = `<table class="data scorecard">
       <thead>
         <tr class="group"><th class="sticky-col"></th>${groups.map((g) => `<th colspan="${g.n}">${esc(g.group)}</th>`).join('')}</tr>
-        <tr><th class="sticky-col sortable" data-j="-1">Sector</th>${head}</tr>
+        <tr><th class="sticky-col sortable" data-j="-1"${ariaSort(-1)}><button type="button" class="th-sort">Sector</button></th>${head}</tr>
       </thead>
       <tbody>
-        ${sorted.map((r) => `<tr data-sector="${esc(r.sector)}" tabindex="0">
+        ${sorted.map((r) => `<tr data-sector="${esc(r.sector)}">
           <td class="sticky-col"><a class="sector-link" href="#/sector/${slugify(r.sector)}">${esc(r.sector)}</a></td>
           ${columns.map((c, j) => cellHtml(c, j, r.values[j], true)).join('')}</tr>`).join('')}
         <tr class="total" style="cursor:default"><td class="sticky-col"><strong>All stocks</strong></td>
@@ -410,16 +417,15 @@ function renderScorecard(el, ds, t) {
     const th = e.target.closest('th[data-j]');
     if (th) {
       const j = Number(th.dataset.j);
-      if (j < 0) return;
-      sort = sort.j === j ? { j, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { j, dir: 'desc' };
-      return draw();
+      sort = sort.j === j ? { j, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { j, dir: j < 0 ? 'asc' : 'desc' };
+      setParams({ sort: `${j < 0 ? 'sector' : columns[j].key}:${sort.dir}` });
+      draw();
+      el.querySelector(`th[data-j="${j}"] button`)?.focus();
+      return;
     }
+    // Rows are clickable for the mouse; the sector link inside is the keyboard stop
     const tr = e.target.closest('tr[data-sector]');
     if (tr && !e.target.closest('a')) location.hash = `#/sector/${slugify(tr.dataset.sector)}`;
-  });
-  el.addEventListener('keydown', (e) => {
-    const tr = e.target.closest('tr[data-sector]');
-    if (tr && e.key === 'Enter') location.hash = `#/sector/${slugify(tr.dataset.sector)}`;
   });
   draw();
 }
@@ -430,7 +436,9 @@ function renderScorecard(el, ds, t) {
 function colorScale(ds, key) {
   const m = ds.metric(key);
   const xs = ds.values(key).filter(isNum);
-  const center = m.signed && m.fmt !== 'ratio' ? 0 : key === 'valuation_score' ? 1 : quantile(xs, 0.5);
+  // Zero is a natural midpoint for returns and scores, not for multiples or ratios
+  const zeroCentred = m.signed && (m.fmt === 'pct' || m.fmt === 'int');
+  const center = zeroCentred ? 0 : quantile(xs, 0.5);
   const spread = quantile(xs.map((x) => Math.abs(x - center)), 0.9) || 1;
   const direction = m.better || 1;
   return { center, spread, at: (v) => (isNum(v) ? (direction * (v - center)) / spread : null) };
@@ -451,13 +459,13 @@ function renderMap(chart, root, ds, t, key) {
   const data = ds.sectors.map((sector) => ({
     name: sector,
     children: ds.peers(sector)
-      .filter((s) => isNum(s.market_cap) && s.market_cap > 0)
+      .filter((s) => ds.weight(s) > 0)
       .map((s) => {
-        const fill = diverging(scale.at(s[key]), div);
-        const area = s.market_cap * pxPerCap;
+        const fill = diverging(scale.at(ds.rankable(s, key)), div);
+        const area = ds.weight(s) * pxPerCap;
         return {
           name: s.ticker,
-          value: s.market_cap,
+          value: ds.weight(s),
           stock: s,
           itemStyle: { color: fill },
           label: { show: area >= 2000, color: inkOn(fill), formatter: area >= 4200 ? undefined : '{t|{b}}' },
@@ -569,7 +577,7 @@ function renderRisk(chart, ds, t) {
         symbol: 'diamond',
         symbolSize: 13,
         itemStyle: { color: t.ink2, borderColor: t.surface, borderWidth: 2 },
-        label: { show: true, position: 'left', color: t.ink, fontSize: 11, fontWeight: 600, formatter: (p) => p.data.name },
+        label: { show: true, position: 'top', color: t.ink, fontSize: 11, fontWeight: 600, formatter: (p) => p.data.name },
       }] : []),
     ],
   });
@@ -606,26 +614,34 @@ function renderMix(chart, ds, t) {
     emphasis: { focus: 'none' },
   });
 
+  const series = [
+    segment('Fairly Valued', f, -1, true),
+    segment('Undervalued', u, -1),
+    segment('Strongly Undervalued', su, -1),
+    segment('Fairly Valued', f, 1, true),
+    segment('Overvalued', o, 1),
+    segment('Strongly Overvalued', so, 1),
+  ];
   chart.setOption({
-    ...base(t),
-    grid: { left: 8, right: 16, top: 4, bottom: 8, containLabel: true },
-    xAxis: valueAxis(t, { min: -1, max: 1, interval: 0.25, formatter: (v) => pct(Math.abs(v), { digits: 0 }) }),
-    yAxis: categoryAxis(t, rows.map((r) => r.sector), { axisLine: { show: false } }),
-    tooltip: tooltip(t, {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow', shadowStyle: { color: t.surface2 } },
-      formatter: (ps) => {
-        const r = rows[ps[0].dataIndex];
-        return tooltipHtml(r.sector, VALUATION_ORDER.map((label, i) => [t.ord[i], label, pct(r.shares[i], { digits: 0 })]));
-      },
-    }),
-    series: [
-      segment('Fairly Valued', f, -1, true),
-      segment('Undervalued', u, -1),
-      segment('Strongly Undervalued', su, -1),
-      segment('Fairly Valued', f, 1, true),
-      segment('Overvalued', o, 1),
-      segment('Strongly Overvalued', so, 1),
-    ],
+    baseOption: {
+      ...base(t),
+      grid: { left: 8, right: 16, top: 4, bottom: 8, containLabel: true },
+      xAxis: valueAxis(t, { min: -1, max: 1, interval: 0.25, formatter: (v) => pct(Math.abs(v), { digits: 0 }) }),
+      yAxis: categoryAxis(t, rows.map((r) => r.sector), { axisLine: { show: false } }),
+      tooltip: tooltip(t, {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow', shadowStyle: { color: t.surface2 } },
+        formatter: (ps) => {
+          const r = rows[ps[0].dataIndex];
+          return tooltipHtml(r.sector, VALUATION_ORDER.map((label, i) => [t.ord[i], label, pct(r.shares[i], { digits: 0 })]));
+        },
+      }),
+      series,
+    },
+    // Narrow charts: segments are too thin to label, and every second tick is enough
+    media: [{
+      query: { maxWidth: 520 },
+      option: { xAxis: { interval: 0.5 }, series: series.map(() => ({ label: { show: false } })) },
+    }],
   });
 }
