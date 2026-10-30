@@ -621,9 +621,23 @@ def get_sp500_tickers():
         return pd.DataFrame()
 
 
+NASDAQ100_PAGES = [
+    'https://en.wikipedia.org/wiki/List_of_NASDAQ-100_companies',
+    'https://en.wikipedia.org/wiki/Nasdaq-100',
+]
+
+
 def get_nasdaq100_tickers():
     """Fetch Nasdaq 100 tickers from Wikipedia"""
-    url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
+    for url in NASDAQ100_PAGES:
+        tickers = get_nasdaq100_tickers_from(url)
+        if len(tickers) > 0:
+            return tickers
+    return pd.DataFrame()
+
+
+def get_nasdaq100_tickers_from(url):
+    """Read the Nasdaq 100 constituents table of one Wikipedia page"""
     try:
         tables = read_wikipedia_tables(url)
         # Find the table with tickers
