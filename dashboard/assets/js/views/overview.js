@@ -581,8 +581,13 @@ function renderRisk(chart, ds, t) {
       }] : []),
     ],
   });
-  // Sectors are told apart by their labels, so every bubble keeps one
-  placeLabels(chart, 0, { font: `11px ${t.font}` });
+  // Sectors are told apart by their labels, so every bubble keeps one, clear of the benchmark and its label
+  const obstacles = [];
+  if (benchmark && isNum(benchmark.vol)) {
+    const [x, y] = chart.convertToPixel({ seriesIndex: 1 }, [benchmark.vol, benchmark.ret]);
+    obstacles.push({ x0: x - 8, x1: x + 8, y0: y - 8, y1: y + 8 }, { x0: x - 28, x1: x + 28, y0: y - 26, y1: y - 8 });
+  }
+  placeLabels(chart, 0, { font: `11px ${t.font}`, obstacles });
   chart.on('click', (p) => {
     if (p.data?.cap) location.hash = `#/sector/${slugify(p.data.name)}`;
   });

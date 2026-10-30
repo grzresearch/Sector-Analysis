@@ -136,7 +136,7 @@ export function tooltipHtml(title, rows = [], note = '') {
  * least with the markers and the labels placed before it (right, left, top
  * or bottom of its marker), so no point loses its name.
  */
-export function placeLabels(chart, seriesIndex, { font, gap = 5, height = 14 } = {}) {
+export function placeLabels(chart, seriesIndex, { font, gap = 5, height = 14, obstacles = [] } = {}) {
   const series = chart.getOption().series[seriesIndex];
   const ctx = document.createElement('canvas').getContext('2d');
   ctx.font = font;
@@ -147,7 +147,7 @@ export function placeLabels(chart, seriesIndex, { font, gap = 5, height = 14 } =
     const [x, y] = chart.convertToPixel({ seriesIndex }, d.value);
     return { x, y, r: (d.symbolSize ?? series.symbolSize ?? 10) / 2 };
   });
-  const taken = points.map(({ x, y, r }) => ({ x0: x - r, y0: y - r, x1: x + r, y1: y + r }));
+  const taken = points.map(({ x, y, r }) => ({ x0: x - r, y0: y - r, x1: x + r, y1: y + r })).concat(obstacles);
   const overlap = (a, b) =>
     Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
 
