@@ -1030,20 +1030,26 @@ def fetch_historical_data(ticker, period='2y'):
         }
 
 
+BENCHMARK_SYMBOLS = [
+    'SPY', 'QQQ', '^VIX',
+    'TLT',  # Treasury bonds
+    'UUP',  # US Dollar
+    'USO',  # Oil
+]
+
+
 def fetch_market_data():
     """Fetch benchmark market data (SPY, QQQ, VIX, rates proxies)"""
-    try:
-        benchmarks = {
-            'SPY': yf.Ticker('SPY').history(period='2y'),
-            'QQQ': yf.Ticker('QQQ').history(period='2y'),
-            '^VIX': yf.Ticker('^VIX').history(period='2y'),
-            'TLT': yf.Ticker('TLT').history(period='2y'),  # Treasury bonds
-            'UUP': yf.Ticker('UUP').history(period='2y'),  # US Dollar
-            'USO': yf.Ticker('USO').history(period='2y'),  # Oil
-        }
-        return benchmarks
-    except:
-        return {}
+    benchmarks = {}
+    for symbol in BENCHMARK_SYMBOLS:
+        # One at a time, so a failed symbol does not take the others with it
+        try:
+            history = yf.Ticker(symbol).history(period='2y')
+        except Exception:
+            continue
+        if len(history) > 0:
+            benchmarks[symbol] = history
+    return benchmarks
 
 
 def fetch_all_data(tickers_df, sample_size=None, delay=0.05):
