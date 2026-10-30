@@ -367,8 +367,8 @@ class ProfitabilityMetrics:
         return nopat / invested_capital if nopat is not None else np.nan
 
     @staticmethod
-    def calculate_roic_from_data(net_income, total_debt, total_equity, cash, tax_rate=0.25):
-        """Calculate ROIC from individual components"""
+    def calculate_roic_from_data(net_income, total_debt, total_equity, cash):
+        """Calculate ROIC from individual components, with net income as the after-tax return"""
         if any(x is None for x in [net_income, total_debt, total_equity]):
             return np.nan
 
@@ -376,9 +376,7 @@ class ProfitabilityMetrics:
         if invested_capital <= 0:
             return np.nan
 
-        # Approximate NOPAT
-        nopat = net_income * (1 + tax_rate * 0.3)  # Simplified approximation
-        return nopat / invested_capital
+        return net_income / invested_capital
 
     @staticmethod
     def roce(ebit, capital_employed):
