@@ -2,9 +2,12 @@
 
 A Python application for analyzing S&P 500 and NASDAQ 100 stocks with **150+ financial metrics**, advanced technical analysis, composite quality scores, and machine learning predictions. It rates every stock against its sector, aggregates sector statistics, and writes CSV reports and charts; a demo mode with simulated data runs without internet access.
 
+**[Open the interactive dashboard](https://grzresearch.github.io/Sector-Analysis/)**: every sector and stock of the latest run, refreshed on weekdays after the US close.
+
 ## Contents
 
 - [Overview](#overview)
+- [Interactive Dashboard](#interactive-dashboard)
 - [Example Outputs](#example-outputs)
 - [Metrics Reference](#metrics-reference)
 - [Installation](#installation)
@@ -27,6 +30,36 @@ This system provides institutional-grade stock analysis capabilities:
 - **150+ Metrics**: Fundamental, technical, performance, and composite scores
 - **Machine Learning**: 5 ML models for performance predictions
 - **Comprehensive Visualizations**: 15+ chart types including heatmaps, scatter plots, dashboards
+
+## Interactive Dashboard
+
+The analysis publishes a static, interactive dashboard to GitHub Pages: <https://grzresearch.github.io/Sector-Analysis/>
+
+| View | What it answers |
+|------|-----------------|
+| **Overview** | How the 11 sectors compare: cap- and equal-weighted sector indices against the S&P 500 for 1W to 2Y, a scorecard of sector medians shaded by how favourable they are, a market-cap map of every stock, risk vs return, and the valuation mix per sector |
+| **Sectors** | One sector in depth: its index against the S&P 500, the cheapest stocks against sector peers, a factor profile placing every constituent by universe percentile, and a sortable table of all constituents |
+| **Screener** | Filter and rank all stocks by sector, rating, technical signal and any metric condition; the screen lives in the URL and exports to CSV |
+| **Factor Lab** | Scatter any two metrics with an OLS fit and rank correlation, distributions by sector, metric and sector-return correlation matrices, and the regression and machine learning diagnostics |
+| **Methodology** | Data provenance, how each rating is computed, and a glossary of every metric |
+
+Selecting a stock anywhere opens its detail panel: price against the sector index, percentile bars against sector peers, analyst targets and every metric. Every view's state is kept in the address bar, so any chart or screen can be shared as a link.
+
+The dashboard is plain HTML, CSS and JavaScript modules in [`dashboard/`](dashboard/) with [Apache ECharts](https://echarts.apache.org/) for the charts; there is no build step. It reads the JSON files that `sector-analysis --dashboard-data` writes, and [`dashboard_data.py`](src/sector_analysis/dashboard_data.py) holds the metric catalog: a metric added there appears in every table, chart picker and the glossary.
+
+### Preview it locally
+
+```bash
+sector-analysis --skip-plots --dashboard-data dashboard/data   # or add --demo to skip the downloads
+python -m http.server 8000 --directory dashboard
+# open http://localhost:8000
+```
+
+### Publishing
+
+The [Dashboard workflow](.github/workflows/dashboard.yml) runs the full analysis on live data and deploys the site on every push to `main`, on weekdays after the US close, and on demand (*Actions → Dashboard → Run workflow*, optionally with a sample size or demo data). It keeps the previous deployment online when fewer than 80% of the stocks could be fetched. Pull requests build the site with demo data to check it without deploying.
+
+One-time setup: in the repository's *Settings → Pages*, set *Source* to **GitHub Actions**.
 
 ## Example Outputs
 
@@ -337,6 +370,7 @@ sector-analysis --basic
 | `--skip-plots` | Skip visualization generation | False |
 | `--demo` / `-d` | Use simulated demo data | False |
 | `--basic` / `-b` | Run basic analysis only | False (comprehensive) |
+| `--dashboard-data DIR` | Also write the dashboard's data files to `DIR` | Not written |
 
 ### Programmatic Access
 
@@ -401,6 +435,12 @@ class ValuationMetrics:
 | `sector_summary.csv` | Aggregated sector statistics |
 | `top_picks_by_sector.csv` | Top undervalued stocks per sector |
 | `regression_report.txt` | Statistical model results |
+
+### Dashboard Data (with `--dashboard-data DIR`)
+| File | Description |
+|------|-------------|
+| `dashboard.json` | Metric catalog, every stock's metrics and ratings, daily sector and benchmark indices, model diagnostics |
+| `prices.json` | Weekly closes per stock for the stock detail panel (live data only) |
 
 ### Visualization Files (PNG)
 | File | Description |
@@ -492,7 +532,12 @@ Sector-Analysis/
 │       ├── technical_analysis.py    # Technical indicators
 │       ├── regression_models.py     # ML & OLS models
 │       ├── visualization.py         # Plotting functions
+│       ├── dashboard_data.py        # JSON export and metric catalog for the dashboard
 │       └── demo_data.py             # Simulated data generator
+├── dashboard/                       # Interactive web dashboard (static site)
+│   ├── index.html
+│   └── assets/                      # Styles and JavaScript modules (views, charts, data model)
+├── .github/workflows/dashboard.yml  # Builds and deploys the dashboard to GitHub Pages
 ├── output/                          # Example outputs (charts, CSV reports)
 ├── pyproject.toml                   # Package metadata and console script
 ├── requirements.txt                 # Python dependencies
@@ -538,7 +583,7 @@ All modules live in `src/sector_analysis/`.
 
 ## Performance Notes
 
-- **Full Analysis**: ~10-15 minutes for all 500+ stocks
+- **Full Analysis**: ~20-25 minutes for all 500+ stocks
 - **Sample Analysis**: ~1 minute for 50 stocks
 - **Demo Mode**: <30 seconds (no API calls)
 - **Memory Usage**: ~500MB for full analysis
