@@ -985,23 +985,17 @@ def fetch_historical_data(ticker, period='2y'):
             'recent_volume': hist['Volume'].iloc[-5:].mean(),
         }
 
-        # Returns at different timeframes
-        if len(hist) > 252:
-            data['1y_return'] = (current_price / hist['Close'].iloc[-252] - 1)
-        if len(hist) > 126:
-            data['6m_return'] = (current_price / hist['Close'].iloc[-126] - 1)
-        if len(hist) > 63:
-            data['3m_return'] = (current_price / hist['Close'].iloc[-63] - 1)
-        if len(hist) > 21:
-            data['1m_return'] = (current_price / hist['Close'].iloc[-21] - 1)
-        if len(hist) > 5:
-            data['1w_return'] = (current_price / hist['Close'].iloc[-5] - 1)
+        # Returns over the last N sessions: from the close N sessions ago
+        for key, sessions in [('1y_return', 252), ('6m_return', 126), ('3m_return', 63),
+                              ('1m_return', 21), ('1w_return', 5)]:
+            if len(hist) > sessions:
+                data[key] = current_price / hist['Close'].iloc[-(sessions + 1)] - 1
 
-        # YTD return
-        current_year = pd.Timestamp.now().year
-        ytd_start = hist[hist.index.year == current_year]
-        if len(ytd_start) > 0:
-            data['ytd_return'] = (current_price / ytd_start['Close'].iloc[0] - 1)
+        # YTD return: from the last close of the previous year
+        year = hist.index[-1].year
+        before = hist[hist.index.year < year]
+        if len(before) > 0:
+            data['ytd_return'] = current_price / before['Close'].iloc[-1] - 1
 
         # Volatility (annualized)
         data['volatility'] = returns.std() * np.sqrt(252)
