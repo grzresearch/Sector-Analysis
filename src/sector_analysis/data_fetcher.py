@@ -724,6 +724,11 @@ def fetch_fundamental_data(ticker, max_retries=3):
             stock = yf.Ticker(ticker)
             info = stock.info
 
+            # A throttled request returns an empty quote (no name, no market cap); without
+            # this check the stock would be kept with no fundamentals and hide the failure
+            if not (info.get('longName') or info.get('shortName') or info.get('marketCap')):
+                raise ValueError('empty quote data (throttled?)')
+
             # Get financial statements
             try:
                 balance_sheet = stock.balance_sheet
@@ -854,7 +859,7 @@ def fetch_fundamental_data(ticker, max_retries=3):
 
         except Exception as e:
             if attempt < max_retries - 1:
-                time.sleep(1)
+                time.sleep(2 ** (attempt + 1))  # back off: 2s, 4s
             else:
                 return {'ticker': ticker, 'error': str(e)}
 
