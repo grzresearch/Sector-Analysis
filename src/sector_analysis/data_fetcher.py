@@ -785,7 +785,8 @@ def fetch_fundamental_data(ticker, max_retries=3):
                 'operating_cashflow': info.get('operatingCashflow', np.nan),
 
                 # Dividend
-                'dividend_yield': info.get('dividendYield', np.nan),
+                # Yahoo reports this field in percent (1.95 = 1.95%); store a fraction like every other ratio
+                'dividend_yield': pd.to_numeric(info.get('dividendYield'), errors='coerce') / 100,
                 'dividend_rate': info.get('dividendRate', np.nan),
                 'payout_ratio': info.get('payoutRatio', np.nan),
                 'five_year_avg_dividend_yield': info.get('fiveYearAvgDividendYield', np.nan),
