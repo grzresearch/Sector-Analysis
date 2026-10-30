@@ -1097,9 +1097,12 @@ def fetch_all_data(tickers_df, sample_size=None, delay=0.05):
         fund_df, on='ticker', how='left', suffixes=('_orig', '')
     )
 
-    # Use sector from API if available, otherwise from original
+    # Use the GICS sector from the index constituents; Yahoo's own classification
+    # (which places e.g. ADP under Technology) only fills the gaps
     if 'sector_orig' in result.columns and 'sector' in result.columns:
-        result['sector'] = result['sector'].fillna(result['sector_orig'])
+        gics = result['sector_orig'].replace('', np.nan)
+        yahoo = result['sector'].replace({'Unknown': np.nan, '': np.nan})
+        result['sector'] = gics.fillna(yahoo).fillna('Unknown')
         result = result.drop(columns=['sector_orig'])
 
     # Merge returns
