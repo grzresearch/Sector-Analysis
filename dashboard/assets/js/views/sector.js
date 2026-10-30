@@ -167,7 +167,7 @@ function renderIndex(chart, ds, t, sector, period, weighting) {
       type: 'category', data: dates, boundaryGap: false,
       axisLine: { lineStyle: { color: t.axis } }, axisTick: { show: false },
       axisLabel: {
-        color: t.muted, fontSize: 11, hideOverlap: true, alignMinLabel: 'left', alignMaxLabel: 'right',
+        color: t.muted, fontSize: 11, hideOverlap: true, alignMaxLabel: 'right',
         formatter: (d) => date(d, { year: period === '2Y' || period === '1Y' }),
       },
     },

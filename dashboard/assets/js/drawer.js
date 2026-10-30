@@ -196,7 +196,7 @@ async function renderPrice(ds, stock) {
     xAxis: {
       type: 'category', data: prices.dates, boundaryGap: false,
       axisLine: { lineStyle: { color: t.axis } }, axisTick: { show: false },
-      axisLabel: { color: t.muted, fontSize: 11, formatter: (d) => date(d), hideOverlap: true, alignMinLabel: 'left', alignMaxLabel: 'right' },
+      axisLabel: { color: t.muted, fontSize: 11, formatter: (d) => date(d), hideOverlap: true, alignMaxLabel: 'right' },
     },
     yAxis: valueAxis(t, { metric: { fmt: 'pct' }, scale: true, splitNumber: 4 }),
     tooltip: tooltip(t, {
