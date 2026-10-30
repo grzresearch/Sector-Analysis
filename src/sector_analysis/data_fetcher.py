@@ -4,6 +4,7 @@ Fetches S&P 500 and NASDAQ 100 stock data using Yahoo Finance API
 Complete coverage of all index constituents with comprehensive fallback
 """
 
+import io
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -561,6 +562,19 @@ NASDAQ100_ONLY = {
 }
 
 
+# Wikipedia rejects requests that do not identify their client (HTTP 403)
+WIKIPEDIA_HEADERS = {
+    'User-Agent': 'sector-analysis (https://github.com/grzresearch/Sector-Analysis)'
+}
+
+
+def read_wikipedia_tables(url):
+    """Read all HTML tables of a Wikipedia page"""
+    response = requests.get(url, headers=WIKIPEDIA_HEADERS, timeout=30)
+    response.raise_for_status()
+    return pd.read_html(io.StringIO(response.text))
+
+
 def get_fallback_tickers():
     """Get comprehensive fallback ticker list when web scraping fails"""
     data = []
@@ -593,7 +607,7 @@ def get_sp500_tickers():
     """Fetch S&P 500 tickers from Wikipedia"""
     url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
     try:
-        tables = pd.read_html(url)
+        tables = read_wikipedia_tables(url)
         df = tables[0]
         df['Symbol'] = df['Symbol'].str.replace('.', '-', regex=False)
         result = df[['Symbol', 'Security', 'GICS Sector', 'GICS Sub-Industry']].rename(
@@ -611,7 +625,7 @@ def get_nasdaq100_tickers():
     """Fetch Nasdaq 100 tickers from Wikipedia"""
     url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
     try:
-        tables = pd.read_html(url)
+        tables = read_wikipedia_tables(url)
         # Find the table with tickers
         for table in tables:
             if 'Ticker' in table.columns or 'Symbol' in table.columns:
@@ -657,6 +671,15 @@ def get_combined_tickers():
         print(f"  - S&P 500: {len([t for t in combined['index'] if t == 'S&P500'])} stocks")
         print(f"  - NASDAQ 100 (unique): {len([t for t in combined['index'] if t == 'NASDAQ100'])} stocks")
         return combined
+
+    # Fill an index whose scrape failed from the fallback list
+    fallback = get_fallback_tickers()
+    if len(sp500) == 0:
+        print("\n⚠ Using fallback S&P 500 list")
+        sp500 = fallback[fallback['index'] == 'S&P500'].drop(columns='index')
+    if len(nasdaq) == 0:
+        print("\n⚠ Using fallback NASDAQ 100 list")
+        nasdaq = fallback[fallback['index'] == 'NASDAQ100'].drop(columns='index')
 
     sp500['index'] = 'S&P500'
     nasdaq['index'] = 'NASDAQ100'
