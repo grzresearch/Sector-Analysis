@@ -24,40 +24,44 @@ SCHEMA_VERSION = 1
 
 # =============================================================================
 # METRIC CATALOG
-# The single source of truth for what the dashboard shows: a metric listed
-# here (and present in the data) appears in every table, chart picker and
-# the glossary.
+# What the dashboard knows about each metric: a metric listed here (and
+# present in the data) appears in the screener conditions, the Factor Lab
+# pickers, the stock panel, the CSV export and the glossary. The table column
+# sets and the fixed lists of the Overview and Sector views are chosen in the
+# dashboard's JavaScript (COLUMN_SETS in dashboard/assets/js/components.js).
 #
-# fmt    - how the value is displayed:
-#          pct (fraction shown as %), pctpt (already in percent points),
-#          multiple (x), ratio, num, int, price, cap, label (categorical)
-# better - +1 when higher is favourable, -1 when lower is, 0 when neutral
+# fmt           - how the value is displayed:
+#                 pct (fraction shown as %), pctpt (already in percent points),
+#                 multiple (x), ratio, num, int, price, cap, label (categorical)
+# better        - +1 when higher is favourable, -1 when lower is, 0 when neutral
+# positive_only - only positive values are meaningful (a negative P/E means a
+#                 loss, not a cheap stock), so others are left out of rankings
 # =============================================================================
 
-Metric = namedtuple('Metric', 'key label group fmt better description')
+Metric = namedtuple('Metric', 'key label group fmt better description positive_only', defaults=(False,))
 
 METRICS = [
     # Profile
     Metric('current_price', 'Price', 'Profile', 'price', 0,
            'Last close in USD.'),
     Metric('market_cap', 'Market cap', 'Profile', 'cap', 0,
-           'Share price times shares outstanding.'),
+           'Market value of the whole company, across all of its share classes.'),
 
     # Valuation
     Metric('forward_pe', 'Forward P/E', 'Valuation', 'multiple', -1,
-           'Price divided by the consensus earnings estimate for the next fiscal year.'),
+           'Price divided by the consensus earnings estimate for the next fiscal year.', True),
     Metric('trailing_pe', 'Trailing P/E', 'Valuation', 'multiple', -1,
-           'Price divided by earnings per share over the last twelve months.'),
+           'Price divided by earnings per share over the last twelve months.', True),
     Metric('peg_ratio', 'PEG ratio', 'Valuation', 'ratio', -1,
-           'P/E divided by expected earnings growth; below 1 suggests growth is cheaply priced.'),
+           'P/E divided by expected earnings growth; below 1 suggests growth is cheaply priced.', True),
     Metric('price_to_book', 'Price / book', 'Valuation', 'multiple', -1,
-           "Market cap divided by shareholders' equity."),
+           "Market cap divided by shareholders' equity.", True),
     Metric('price_to_sales', 'Price / sales', 'Valuation', 'multiple', -1,
-           'Market cap divided by trailing twelve-month revenue.'),
+           'Market cap divided by trailing twelve-month revenue.', True),
     Metric('ev_to_ebitda', 'EV / EBITDA', 'Valuation', 'multiple', -1,
-           'Enterprise value divided by EBITDA; compares companies regardless of capital structure.'),
+           'Enterprise value divided by EBITDA; compares companies regardless of capital structure.', True),
     Metric('ev_to_revenue', 'EV / revenue', 'Valuation', 'multiple', -1,
-           'Enterprise value divided by trailing twelve-month revenue.'),
+           'Enterprise value divided by trailing twelve-month revenue.', True),
     Metric('fcf_yield', 'FCF yield', 'Valuation', 'pct', 1,
            'Free cash flow divided by market cap.'),
     Metric('dividend_yield', 'Dividend yield', 'Valuation', 'pct', 1,
@@ -77,7 +81,7 @@ METRICS = [
     Metric('roa', 'Return on assets', 'Profitability', 'pct', 1,
            'Net income divided by total assets.'),
     Metric('roic', 'Return on invested capital', 'Profitability', 'pct', 1,
-           'After-tax net income divided by debt plus equity minus cash.'),
+           'Net income divided by debt plus equity minus cash.'),
 
     # Growth
     Metric('revenue_growth', 'Revenue growth', 'Growth', 'pct', 1,
@@ -99,17 +103,17 @@ METRICS = [
 
     # Returns
     Metric('1w_return', '1W return', 'Returns', 'pct', 1,
-           'Price return over the last 5 trading days.'),
+           'Total return (dividends reinvested) over the last 5 trading days.'),
     Metric('1m_return', '1M return', 'Returns', 'pct', 1,
-           'Price return over the last 21 trading days.'),
+           'Total return (dividends reinvested) over the last 21 trading days.'),
     Metric('3m_return', '3M return', 'Returns', 'pct', 1,
-           'Price return over the last 63 trading days.'),
+           'Total return (dividends reinvested) over the last 63 trading days.'),
     Metric('6m_return', '6M return', 'Returns', 'pct', 1,
-           'Price return over the last 126 trading days.'),
+           'Total return (dividends reinvested) over the last 126 trading days.'),
     Metric('ytd_return', 'YTD return', 'Returns', 'pct', 1,
-           'Price return since the first trading day of the year.'),
+           'Total return (dividends reinvested) since the last close of the previous year.'),
     Metric('1y_return', '1Y return', 'Returns', 'pct', 1,
-           'Price return over the last 252 trading days.'),
+           'Total return (dividends reinvested) over the last 252 trading days.'),
     Metric('excess_return', 'Excess return vs sector', 'Returns', 'pct', 1,
            '1-year return minus the average 1-year return of the sector.'),
 
@@ -179,7 +183,8 @@ METRICS = [
     Metric('quality_score', 'Quality score', 'Quality', 'num', 1,
            'Composite of profitability, balance sheet strength, growth and PEG ratio, from 0 to 100.'),
     Metric('altman_z_score', 'Altman Z-score', 'Quality', 'ratio', 1,
-           'Bankruptcy risk: above 2.99 safe, 1.81 to 2.99 grey zone, below 1.81 distress. Not meaningful for banks.'),
+           'Bankruptcy risk: above 2.99 safe, 1.81 to 2.99 grey zone, below 1.81 distress. '
+           'Not computed for financials, real estate and utilities, whose balance sheets the model was not built for.'),
     Metric('z_score_zone', 'Z-score zone', 'Quality', 'label', 0,
            'Safe, grey or distress zone of the Altman Z-score.'),
 
@@ -207,7 +212,8 @@ METRICS = [
     Metric('valuation_rating', 'Valuation rating', 'Ratings', 'int', -1,
            '1 strongly undervalued to 5 strongly overvalued.'),
     Metric('valuation_score', 'Valuation score', 'Ratings', 'ratio', -1,
-           'Weighted sector-relative P/E, P/B, debt/equity, ROE, FCF yield and margin; below 1 is cheaper than sector peers.'),
+           'Weighted sector-relative forward P/E, P/B, debt/equity, inverse ROE, FCF yield and inverse margin; '
+           'lower is cheaper relative to sector peers.'),
     Metric('performance_category', 'Performance', 'Ratings', 'label', 0,
            'Performance rating bucket: the universe split into quintiles of the performance score.'),
     Metric('performance_rating', 'Performance rating', 'Ratings', 'int', -1,
@@ -219,6 +225,9 @@ METRICS = [
 ]
 
 IDENTITY_COLUMNS = ['ticker', 'name', 'sector', 'industry', 'index']
+
+# Market value of each listing, for weights and totals (not shown as a metric)
+WEIGHT_COLUMN = 'listing_cap'
 
 BENCHMARKS = ['SPY', 'QQQ']
 
@@ -256,9 +265,33 @@ def _write_json(payload, path):
 # STOCKS
 # =============================================================================
 
+def listing_caps(df):
+    """
+    Market value of each listed share class
+
+    Yahoo reports the whole company's market cap on every class of a
+    dual-class company (GOOG and GOOGL, FOX and FOXA), so summing market_cap
+    counts such companies twice. Split the company value across its listings
+    in proportion to each listing's own shares times price.
+    """
+    caps = df['market_cap'].astype(float)
+    if 'name' not in df:
+        return caps
+    named = df[df['name'].fillna('') != '']
+    for _, listings in named.groupby('name'):
+        if len(listings) < 2:
+            continue
+        own = (listings['shares_outstanding'] * listings['current_price']
+               if 'shares_outstanding' in listings else pd.Series(np.nan, index=listings.index))
+        share = own / own.sum() if own.notna().all() and own.sum() > 0 else 1 / len(listings)
+        caps.loc[listings.index] = listings['market_cap'].max() * share
+    return caps
+
+
 def add_derived_metrics(df):
     """Add the dashboard metrics that are simple ratios of fetched fields"""
     df = df.copy()
+    df[WEIGHT_COLUMN] = listing_caps(df)
 
     if 'sharpe_ratio' not in df.columns and 'sharpe_approx' in df.columns:
         df['sharpe_ratio'] = df['sharpe_approx']
@@ -280,7 +313,7 @@ def build_stock_table(df):
 
     metrics = [m for m in METRICS if m.key in df.columns and df[m.key].notna().any()]
     identity = [c for c in IDENTITY_COLUMNS if c in df.columns]
-    columns = identity + [m.key for m in metrics]
+    columns = identity + [WEIGHT_COLUMN] + [m.key for m in metrics]
 
     text_columns = set(identity) | {m.key for m in metrics if m.fmt == 'label'}
     rows = [
@@ -318,12 +351,13 @@ def sector_indices(closes, df):
     """
     Cap-weighted and equal-weighted daily price index per sector
 
-    The cap-weighted index holds today's share count of every constituent
-    (market cap / price), so each day's return is weighted by the previous
-    day's market value; stocks enter once they have a price.
+    The cap-weighted index holds today's share count of every listing
+    (listing market value / price), so each day's return is weighted by the
+    previous day's market value; stocks enter once they have a price.
     """
     returns = closes.pct_change(fill_method=None)
-    shares = (df.set_index('ticker')['market_cap'] / df.set_index('ticker')['current_price'])
+    stocks = df.set_index('ticker')
+    shares = listing_caps(stocks) / stocks['current_price']
     values = closes.mul(shares.reindex(closes.columns), axis=1).shift(1)
 
     indices = {}
