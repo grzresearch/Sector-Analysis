@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sector Analysis</title>
+  <meta name="description" content="Interactive sector and stock analysis of the S&amp;P 500 and Nasdaq-100: valuation, quality, risk, momentum and factor models across all 11 GICS sectors.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M8 23v-6M13 23V11M18 23v-9M23 23V8' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <script>
+    // Apply the theme before first paint: the saved choice, else the OS preference
+    (function () {
+      var theme = null;
+      try { theme = localStorage.getItem('theme'); } catch (e) {}
+      if (theme !== 'light' && theme !== 'dark') {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+  <link rel="stylesheet" href="assets/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"
+          integrity="sha384-pPi0zxBAoDu6+JXW/C68UZLvBUUtU+7zonhif43rqj7pxsGyqyqzcian2Rj37Rss"
+          crossorigin="anonymous" defer></script>
+  <script type="module" src="assets/js/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#view">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#/" aria-label="Sector Analysis, overview">
+        <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="var(--accent)"/>
+          <path d="M8 23v-6M13 23V11M18 23v-9M23 23V8" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <span>Sector Analysis</span>
+      </a>
+
+      <nav class="nav" aria-label="Views">
+        <a href="#/" data-route="/">Overview</a>
+        <a href="#/sector" data-route="/sector">Sectors</a>
+        <a href="#/screener" data-route="/screener">Screener</a>
+        <a href="#/lab" data-route="/lab">Factor Lab</a>
+        <a href="#/methodology" data-route="/methodology">Methodology</a>
+      </nav>
+
+      <div class="topbar-tools">
+        <div class="search" role="search">
+          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input id="search" type="search" placeholder="Search ticker or company" autocomplete="off" spellcheck="false"
+                 role="combobox" aria-expanded="false" aria-controls="search-results" aria-label="Search stocks">
+          <kbd>/</kbd>
+          <ul id="search-results" class="search-results" role="listbox" hidden></ul>
+        </div>
+        <span id="data-badge" class="data-badge" hidden></span>
+        <button id="theme-toggle" class="icon-button" type="button" aria-label="Toggle dark mode">
+          <svg class="icon-sun" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <svg class="icon-moon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16.5 12.2A7 7 0 0 1 7.8 3.5a7 7 0 1 0 8.7 8.7Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="view" class="page" tabindex="-1">
+    <div class="loading" role="status">
+      <div class="loading-bar"></div>
+      <p>Loading market data…</p>
+    </div>
+  </main>
+
+  <aside id="drawer" class="drawer" aria-hidden="true" aria-label="Stock details">
+    <div class="drawer-backdrop" data-close></div>
+    <div class="drawer-panel" role="dialog" aria-modal="true" tabindex="-1">
+      <button class="icon-button drawer-close" type="button" aria-label="Close" data-close>
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <div class="drawer-body"></div>
+    </div>
+  </aside>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <p id="footer-source"></p>
+      <p>For research and education only. Nothing on this page is investment advice.
+        <a href="https://github.com/grzresearch/Sector-Analysis">Source on GitHub</a></p>
+    </div>
+  </footer>
+</body>
+</html>
