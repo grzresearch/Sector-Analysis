@@ -1,0 +1,85 @@
+name: Dashboard
+
+# Runs the analysis on live market data and publishes the interactive
+# dashboard (dashboard/) to GitHub Pages.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekdays after the US close: 22:17 UTC is 18:17 in New York (17:17 in winter)
+    - cron: '17 22 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: Analyse only the first N stocks (empty for the full universe)
+        required: false
+      demo:
+        description: Publish simulated demo data instead of live market data
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Copy the site
+        run: mkdir -p build/site && cp -r dashboard/. build/site/
+
+      - name: Run the analysis
+        env:
+          # Pull requests only check that the pipeline and the site build, without market data requests
+          DEMO: ${{ github.event_name == 'pull_request' || inputs.demo }}
+          SAMPLE: ${{ inputs.sample }}
+        run: |
+          args=(--skip-plots --output build/output --dashboard-data build/site/data)
+          if [ "$DEMO" = "true" ]; then args+=(--demo); fi
+          if [ -n "$SAMPLE" ]; then args+=(--sample "$SAMPLE"); fi
+          sector-analysis "${args[@]}"
+
+      - name: Check coverage
+        # A throttled data source must not replace a complete dashboard with a partial one
+        if: github.event_name != 'pull_request' && !inputs.demo
+        run: |
+          jq -e '.meta.universe.analyzed >= 0.8 * .meta.universe.size' build/site/data/dashboard.json > /dev/null || {
+            echo "::error::Less than 80% of the universe could be analysed; the current deployment stays online."
+            exit 1
+          }
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
