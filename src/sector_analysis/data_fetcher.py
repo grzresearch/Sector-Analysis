@@ -759,6 +759,8 @@ def fetch_fundamental_data(ticker, max_retries=3):
                 'industry': info.get('industry', 'Unknown'),
                 'market_cap': info.get('marketCap', np.nan),
                 'enterprise_value': info.get('enterpriseValue', np.nan),
+                'currency': info.get('currency', ''),
+                'financial_currency': info.get('financialCurrency', ''),
                 'current_price': info.get('currentPrice', info.get('regularMarketPrice', np.nan)),
                 'shares_outstanding': info.get('sharesOutstanding', np.nan),
                 'float_shares': info.get('floatShares', np.nan),

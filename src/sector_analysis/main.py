@@ -54,6 +54,10 @@ from .demo_data import generate_demo_dataset
 from .dashboard_data import export_dashboard_data
 
 
+# Sectors whose balance sheets the Altman Z-Score was not designed for
+ALTMAN_EXCLUDED_SECTORS = ['Financials', 'Real Estate', 'Utilities']
+
+
 def print_banner():
     """Print application banner"""
     banner = """
@@ -181,6 +185,13 @@ def calculate_quality_scores(df):
             return np.nan
 
     df['altman_z_score'] = df.apply(calc_z_score, axis=1)
+    # The model was built on industrial companies: leave it out where it does not apply,
+    # and where statements are in another currency than the market cap
+    not_applicable = df['sector'].isin(ALTMAN_EXCLUDED_SECTORS)
+    if {'currency', 'financial_currency'} <= set(df.columns):
+        not_applicable |= (df['financial_currency'].fillna('') != '') & (
+            df['financial_currency'] != df['currency'])
+    df.loc[not_applicable, 'altman_z_score'] = np.nan
     df['z_score_zone'] = df['altman_z_score'].apply(CompositeScores.interpret_z_score)
 
     # Piotroski F-Score
